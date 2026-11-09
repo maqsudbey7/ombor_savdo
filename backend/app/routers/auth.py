@@ -14,10 +14,7 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 def register(data: RegisterIn, db: Session = Depends(get_db)):
     if db.scalar(select(User).where(User.phone == data.phone)):
         raise HTTPException(status.HTTP_409_CONFLICT, "Bu telefon raqam ro‘yxatdan o‘tgan")
-    user = User(
-        name=data.name.strip(), phone=data.phone,
-        company=(data.company or "").strip() or None, password_hash=hash_password(data.password),
-    )
+    user = User(name=data.name.strip(), phone=data.phone, password_hash=hash_password(data.password))
     db.add(user)
     db.commit()
     return TokenOut(access_token=create_token(user), user=UserOut.model_validate(user))

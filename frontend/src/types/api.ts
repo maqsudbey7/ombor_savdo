@@ -1,105 +1,106 @@
 // Backend Pydantic sxemalariga mos TypeScript interfeyslari
 
-export type Role = 'customer' | 'admin';
-export type OrderStatus = 'new' | 'confirmed' | 'shipping' | 'delivered' | 'cancelled';
-export type PaymentMethod = 'cash' | 'transfer' | 'card';
-export type SortBy = 'recommended' | 'price_asc' | 'price_desc' | 'new' | 'name';
+export type Color = 'blue' | 'emerald' | 'amber' | 'rose' | 'violet' | 'cyan' | 'orange' | 'slate';
+export type MovementType = 'in' | 'out' | 'adjust';
+export type StockFilter = 'all' | 'low' | 'out';
+export type ProductSort = 'name' | 'new' | 'qty_asc' | 'qty_desc' | 'value_desc';
 
-export interface User {
-  id: number;
-  name: string;
-  phone: string;
-  company: string | null;
-  role: Role;
-}
-
-export interface TokenResponse {
-  access_token: string;
-  token_type: 'bearer';
-  user: User;
-}
-
-export interface RegisterPayload { name: string; phone: string; company?: string; password: string }
+export interface User { id: number; name: string; phone: string }
+export interface TokenResponse { access_token: string; token_type: 'bearer'; user: User }
+export interface RegisterPayload { name: string; phone: string; password: string }
 export interface LoginPayload { phone: string; password: string }
 
-export interface CategoryBrief { id: number; name: string; slug: string; icon: string }
-export interface Category extends CategoryBrief { product_count: number }
+export interface Warehouse {
+  id: number;
+  name: string;
+  address: string;
+  description: string;
+  color: Color;
+  created_at: string;
+}
+export interface WarehouseSummary extends Warehouse {
+  product_count: number;
+  total_quantity: number;
+  stock_value: number;
+  low_stock_count: number;
+  last_movement_at: string | null;
+}
+export interface WarehousePayload {
+  name: string;
+  address: string;
+  description: string;
+  color: Color;
+  with_sample?: boolean;
+}
 
-export interface PriceTier { min_qty: number; price: number }
+export interface Category { id: number; name: string; color: Color; product_count: number }
+export interface CategoryPayload { name: string; color: Color }
 
 export interface Product {
   id: number;
   name: string;
   sku: string;
-  description: string;
   category_id: number | null;
-  category: CategoryBrief | null;
-  image_url: string | null;
+  category: { id: number; name: string; color: Color } | null;
   unit: string;
-  pack_size: number;
-  stock: number;
-  moq: number;
-  base_price: number;
-  is_active: boolean;
-  tiers: PriceTier[];
+  cost_price: number;
+  sale_price: number;
+  quantity: number;
+  min_quantity: number;
+  location: string;
+  description: string;
   created_at: string;
+  updated_at: string;
 }
-
 export interface ProductPayload {
   name: string;
   sku: string;
-  description: string;
   category_id: number | null;
-  image_url: string | null;
   unit: string;
-  pack_size: number;
-  stock: number;
-  moq: number;
-  base_price: number;
-  is_active: boolean;
-  tiers: PriceTier[];
+  cost_price: number;
+  sale_price: number;
+  min_quantity: number;
+  location: string;
+  description: string;
+  initial_quantity?: number;
 }
+export interface ProductFilters { q?: string; category_id?: number; stock?: StockFilter; sort?: ProductSort }
 
-export interface ProductFilters { q?: string; category?: string; sort?: SortBy; in_stock?: boolean }
-
-export interface OrderItem { id: number; product_id: number | null; name: string; unit: string; qty: number; unit_price: number }
-
-export interface Order {
+export interface Movement {
   id: number;
-  status: OrderStatus;
-  total: number;
-  address: string;
-  note: string | null;
-  payment_method: PaymentMethod;
+  product_id: number | null;
+  type: MovementType;
+  product_name: string;
+  unit: string;
+  quantity: number;
+  delta: number;
+  balance_after: number;
+  price: number;
+  counterparty: string;
+  note: string;
   created_at: string;
-  items: OrderItem[];
 }
-
-export interface AdminOrder extends Order { user: User }
-
-export interface OrderPayload {
-  items: { product_id: number; qty: number }[];
-  address: string;
-  note?: string;
-  payment_method: PaymentMethod;
+export interface MovementPayload {
+  product_id: number;
+  type: MovementType;
+  quantity: number;
+  price?: number;
+  counterparty: string;
+  note: string;
 }
+export interface MovementFilters { type?: MovementType; product_id?: number; limit?: number }
 
-export interface Stats {
-  revenue: number;
-  orders: number;
-  new_orders: number;
-  customers: number;
-  products: number;
-  low_stock: { id: number; name: string; stock: number; unit: string; moq: number }[];
-  daily: { day: string; total: number; count: number }[];
-}
-
-export interface Customer {
-  id: number;
-  name: string;
-  phone: string;
-  company: string | null;
-  created_at: string;
-  orders: number;
-  spent: number;
+export interface Dashboard {
+  product_count: number;
+  total_quantity: number;
+  stock_value: number;
+  potential_revenue: number;
+  low_stock_count: number;
+  out_of_stock_count: number;
+  month_in_value: number;
+  month_out_value: number;
+  daily: { day: string; in_qty: number; out_qty: number; in_value: number; out_value: number }[];
+  low_stock: { id: number; name: string; sku: string; unit: string; quantity: number; min_quantity: number }[];
+  categories: { name: string; color: Color; product_count: number; stock_value: number }[];
+  recent: Movement[];
 }

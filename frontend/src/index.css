@@ -2,17 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  html { -webkit-tap-highlight-color: transparent; }
+  ::selection { @apply bg-brand-200 text-brand-900; }
+}
+
 @layer components {
-  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition active:scale-[.98] disabled:opacity-50 disabled:pointer-events-none; }
-  .btn-primary { @apply btn bg-brand-600 text-white hover:bg-brand-700 shadow-sm shadow-brand-600/30; }
-  .btn-ghost { @apply btn bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50; }
+  .btn { @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-semibold transition duration-200 active:scale-[.97] disabled:pointer-events-none disabled:opacity-50; }
+  .btn-primary { @apply btn bg-brand-600 text-white shadow-sm shadow-brand-600/30 hover:bg-brand-700 hover:shadow-glow; }
+  .btn-ghost { @apply btn bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50 hover:ring-slate-300; }
+  .btn-soft { @apply btn bg-slate-100 text-slate-700 hover:bg-slate-200; }
   .btn-danger { @apply btn bg-rose-50 text-rose-600 hover:bg-rose-100; }
-  .input { @apply w-full rounded-xl border-0 bg-white px-3.5 py-2.5 text-sm ring-1 ring-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500; }
+  .btn-in { @apply btn bg-emerald-600 text-white shadow-sm shadow-emerald-600/30 hover:bg-emerald-700; }
+  .btn-out { @apply btn bg-rose-600 text-white shadow-sm shadow-rose-600/30 hover:bg-rose-700; }
+  .icon-btn { @apply grid h-9 w-9 place-items-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-800; }
+  .input { @apply w-full rounded-xl border-0 bg-white px-3.5 py-2.5 text-sm ring-1 ring-slate-200 transition placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500; }
   .label { @apply mb-1.5 block text-sm font-medium text-slate-600; }
   .card { @apply rounded-2xl bg-white ring-1 ring-slate-200/70 shadow-soft; }
   .badge { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold; }
+  .th { @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500; }
+  .td { @apply px-4 py-3; }
 }
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
-@keyframes fadein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.bg-grid {
+  background-image: linear-gradient(to right, rgb(255 255 255 / .06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / .06) 1px, transparent 1px);
+  background-size: 40px 40px;
+}

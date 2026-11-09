@@ -1,3 +1,4 @@
+import logging
 import os
 from collections.abc import Generator
 
@@ -7,11 +8,14 @@ from sqlalchemy.pool import NullPool
 
 from .config import settings
 
-# Vercel (serverless) da har bir so'rov qisqa yashaydi — ulanishlar pool'da saqlanmaydi.
+log = logging.getLogger("ombor")
+
+# Vercel (serverless) da har bir chaqiruv qisqa yashaydi — ulanishlar pool'da saqlanmaydi.
 _serverless = bool(os.getenv("VERCEL"))
 engine = create_engine(
     settings.database_url,
     pool_pre_ping=True,
+    connect_args={"connect_timeout": 10},
     **({"poolclass": NullPool} if _serverless else {}),
 )
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
@@ -22,6 +26,7 @@ class Base(DeclarativeBase):
 
 
 def get_db() -> Generator[Session, None, None]:
+    ensure_db()
     db = SessionLocal()
     try:
         yield db
@@ -29,11 +34,28 @@ def get_db() -> Generator[Session, None, None]:
         db.close()
 
 
-def init_db() -> None:
-    """Jadvallarni yaratadi va bo'sh bazaga demo ma'lumot qo'shadi."""
-    from . import models  # noqa: F401  (modellar Base.metadata'ga yozilishi uchun)
-    from .seed import seed
+_ready = False
+
+
+def ensure_db() -> None:
+    """Jadvallarni (bir marta) yaratadi va bo'sh bazaga demo ma'lumot qo'shadi.
+
+    Xato bo'lsa ham ilovani yiqitmaydi — keyingi so'rovda yana urinib ko'radi.
+    """
+    global _ready
+    if _ready:
+        return
+    from . import models  # noqa: F401
+    from .seed import seed_demo
 
     Base.metadata.create_all(engine)
     with SessionLocal() as db:
-        seed(db)
+        seed_demo(db)
+    _ready = True
+
+
+def try_init_db() -> None:
+    try:
+        ensure_db()
+    except Exception as e:  # noqa: BLE001
+        log.error("Bazani tayyorlab bo'lmadi: %s", e)

@@ -5,4 +5,15 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: { proxy: { '/api': 'http://localhost:8000' } },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          data: ['@reduxjs/toolkit', 'react-redux', '@tanstack/react-query'],
+          motion: ['motion'],
+        },
+      },
+    },
+  },
 });

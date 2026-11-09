@@ -1,59 +1,74 @@
-def test_register_duplicate_phone(client, customer):
-    r = client.post("/api/auth/register", json={"name": "Boshqa", "phone": "+998911112233", "password": "secret12"})
-    assert r.status_code == 409
+from tests.conftest import register
 
 
-def test_login_wrong_password(client):
-    r = client.post("/api/auth/login", json={"phone": "+998900000000", "password": "wrong!!"})
-    assert r.status_code == 401
+def test_auth(client, user):
+    assert client.post("/api/auth/register", json={"name": "Boshqa", "phone": "+998911112233", "password": "secret12"}).status_code == 409
+    assert client.post("/api/auth/login", json={"phone": "+998911112233", "password": "noto'g'ri"}).status_code == 401
+    assert client.get("/api/auth/me", headers=user).json()["phone"] == "+998911112233"
+    assert client.get("/api/warehouses").status_code == 401
 
 
-def test_catalog_filters(client):
-    assert len(client.get("/api/products").json()) == 16
-    assert {p["sku"] for p in client.get("/api/products?category=elektr").json()} == {"EL-001", "EL-002"}
-    assert all(p["stock"] > 0 for p in client.get("/api/products?in_stock=true").json())
-    assert client.get("/api/products/9999").status_code == 404
+def test_demo_account_has_data(client):
+    r = client.post("/api/auth/login", json={"phone": "+998900000000", "password": "demo123"})
+    h = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    whs = client.get("/api/warehouses", headers=h).json()
+    assert len(whs) == 2 and whs[0]["product_count"] > 0
+    d = client.get(f"/api/warehouses/{whs[0]['id']}/dashboard", headers=h).json()
+    assert len(d["daily"]) == 14 and d["recent"] and d["stock_value"] > 0
 
 
-def test_order_uses_tier_price_and_decrements_stock(client, customer):
-    r = client.post("/api/orders", headers=customer, json={"items": [{"product_id": 1, "qty": 20}], "address": "Toshkent sh."})
-    assert r.status_code == 201
-    assert r.json()["items"][0]["unit_price"] == 505000  # 20+ pog‘ona
-    assert r.json()["total"] == 20 * 505000
-    assert client.get("/api/products/1").json()["stock"] == 400
+def test_warehouses_are_private(client, user, wh):
+    other = register(client, "+998 93 333 44 55")
+    assert client.get(f"/api/warehouses/{wh}", headers=other).status_code == 404
+    assert client.get(f"/api/warehouses/{wh}/products", headers=other).status_code == 404
+    assert client.get("/api/warehouses", headers=other).json() == []
 
 
-def test_order_validation(client, customer):
-    body = {"address": "Toshkent sh."}
-    assert client.post("/api/orders", json={**body, "items": [{"product_id": 1, "qty": 5}]}).status_code == 401
-    assert client.post("/api/orders", headers=customer, json={**body, "items": [{"product_id": 1, "qty": 2}]}).status_code == 400  # MOQ
-    assert client.post("/api/orders", headers=customer, json={**body, "items": [{"product_id": 1, "qty": 9999}]}).status_code == 409  # stock
-    assert client.post("/api/orders", headers=customer, json={**body, "items": []}).status_code == 422
+def test_sample_warehouse(client, user):
+    r = client.post("/api/warehouses", headers=user, json={"name": "Namuna", "with_sample": True})
+    wid = r.json()["id"]
+    assert len(client.get(f"/api/warehouses/{wid}/products", headers=user).json()) == 14
+    assert len(client.get(f"/api/warehouses/{wid}/categories", headers=user).json()) == 5
 
 
-def test_admin_requires_role(client, customer):
-    assert client.get("/api/admin/stats", headers=customer).status_code == 403
-    assert client.get("/api/admin/stats").status_code == 401
+def test_product_crud_and_movements(client, user, wh):
+    base = f"/api/warehouses/{wh}"
+    cat = client.post(f"{base}/categories", headers=user, json={"name": "Oziq-ovqat", "color": "amber"}).json()
+    assert client.post(f"{base}/categories", headers=user, json={"name": "Oziq-ovqat"}).status_code == 409
+    data = {"name": "Guruch 25 kg", "sku": "G-1", "category_id": cat["id"], "unit": "qop",
+            "cost_price": 470000, "sale_price": 520000, "min_quantity": 10, "initial_quantity": 50}
+    p = client.post(f"{base}/products", headers=user, json=data)
+    assert p.status_code == 201 and p.json()["quantity"] == 50
+    pid = p.json()["id"]
+    assert client.post(f"{base}/products", headers=user, json=data).status_code == 409  # SKU band
+
+    mv = lambda t, q: client.post(f"{base}/movements", headers=user, json={"product_id": pid, "type": t, "quantity": q})  # noqa: E731
+    r = mv("out", 45)
+    assert r.status_code == 201 and r.json()["balance_after"] == 5 and r.json()["price"] == 520000
+    assert mv("out", 6).status_code == 409          # qoldiqdan ko'p
+    assert mv("in", 0).status_code == 400
+    assert mv("in", 20).json()["balance_after"] == 25
+    r = mv("adjust", 23)                             # inventarizatsiya: 2 ta kam chiqdi
+    assert r.json()["delta"] == -2 and r.json()["balance_after"] == 23
+
+    low = client.get(f"{base}/products?stock=low", headers=user).json()
+    assert low == []
+    assert len(client.get(f"{base}/movements?type=in", headers=user).json()) == 2  # boshlang'ich + kirim
+
+    upd = client.put(f"{base}/products/{pid}", headers=user, json={**data, "min_quantity": 30, "sku": "G-1"})
+    assert upd.json()["quantity"] == 23 and upd.json()["min_quantity"] == 30   # PUT qoldiqni o'zgartirmaydi
+    d = client.get(f"{base}/dashboard", headers=user).json()
+    assert d["low_stock_count"] == 1 and d["stock_value"] == 23 * 470000
+
+    csv = client.get(f"{base}/products/export", headers=user)
+    assert csv.status_code == 200 and "Guruch 25 kg" in csv.text
+
+    assert client.delete(f"{base}/products/{pid}", headers=user).status_code == 204
+    hist = client.get(f"{base}/movements", headers=user).json()
+    assert len(hist) == 4 and hist[0]["product_id"] is None  # tarix saqlanadi
+    assert client.delete(f"{base}", headers=user).status_code == 204
+    assert client.get(f"{base}", headers=user).status_code == 404
 
 
-def test_cancel_returns_stock(client, admin, customer):
-    oid = client.post("/api/orders", headers=customer, json={"items": [{"product_id": 2, "qty": 10}], "address": "Toshkent sh."}).json()["id"]
-    assert client.get("/api/products/2").json()["stock"] == 290
-    r = client.patch(f"/api/admin/orders/{oid}", headers=admin, json={"status": "cancelled"})
-    assert r.status_code == 200 and r.json()["status"] == "cancelled"
-    assert client.get("/api/products/2").json()["stock"] == 300
-
-
-def test_product_crud(client, admin):
-    data = {"name": "Un 50 kg", "sku": "OZ-100", "base_price": 380000, "stock": 10, "moq": 2, "category_id": 1,
-            "tiers": [{"min_qty": 30, "price": 365000}]}
-    r = client.post("/api/admin/products", headers=admin, json=data)
-    assert r.status_code == 201
-    pid = r.json()["id"]
-    assert client.post("/api/admin/products", headers=admin, json=data).status_code == 409  # SKU band
-    assert client.post("/api/admin/products", headers=admin, json={**data, "sku": "X", "tiers": [{"min_qty": 5, "price": 999999}]}).status_code == 422
-    r = client.put(f"/api/admin/products/{pid}", headers=admin, json={**data, "base_price": 390000, "tiers": []})
-    assert r.json()["base_price"] == 390000 and r.json()["tiers"] == []
-    assert client.patch(f"/api/admin/products/{pid}/stock", headers=admin, json={"delta": -100}).json()["stock"] == 0
-    assert client.delete(f"/api/admin/products/{pid}", headers=admin).status_code == 204
-    assert client.get(f"/api/products/{pid}").status_code == 404
+def test_health(client):
+    assert client.get("/api/health").json() == {"status": "ok", "database": "ok"}

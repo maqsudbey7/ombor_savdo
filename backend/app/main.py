@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -6,24 +7,29 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 from .config import settings
-from .database import init_db
-from .routers import admin, auth, catalog, orders
+from .database import engine, try_init_db
+from .routers import auth, categories, movements, products, warehouses
+
+log = logging.getLogger("ombor")
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    init_db()
+    # Baza ishlamasa ham ilova ishga tushadi; so'rovlar aniq xabar (503) qaytaradi.
+    try_init_db()
     if settings.jwt_secret == "dev-secret-change-me":
-        print("⚠️  JWT_SECRET o‘rnatilmagan — production’da albatta o‘zgartiring!")
+        log.warning("JWT_SECRET o‘rnatilmagan — production’da albatta o‘zgartiring!")
     yield
 
 
 app = FastAPI(
     title="OmborSavdo API",
-    description="Ulgurji (omborlik) savdo platformasi uchun REST API",
-    version="1.0.0",
+    description="Omborlar, mahsulotlar va kirim-chiqim hisobini yuritish uchun REST API",
+    version="2.0.0",
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -38,6 +44,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+DB_HELP = (
+    "Ma’lumotlar bazasiga ulanib bo‘lmadi. Vercel’da Storage → Neon bazasini loyihaga ulang"
+    " (DATABASE_URL), so‘ng Redeploy qiling."
+)
+
 
 @app.exception_handler(RequestValidationError)
 async def validation_handler(_: Request, exc: RequestValidationError):
@@ -47,26 +58,45 @@ async def validation_handler(_: Request, exc: RequestValidationError):
     msg = str(first.get("msg", "Ma’lumot noto‘g‘ri")).removeprefix("Value error, ")
     return JSONResponse(
         status_code=422,
-        content={"detail": f"{field}: {msg}" if field else msg, "errors": jsonable(errors)},
+        content={
+            "detail": f"{field}: {msg}" if field else msg,
+            "errors": [{"loc": e.get("loc"), "msg": str(e.get("msg")), "type": e.get("type")} for e in errors],
+        },
     )
 
 
-def jsonable(errors: list[dict]) -> list[dict]:
-    return [{"loc": e.get("loc"), "msg": str(e.get("msg")), "type": e.get("type")} for e in errors]
+@app.exception_handler(OperationalError)
+async def db_unavailable(_: Request, exc: OperationalError):
+    log.error("Baza xatosi: %s", exc.orig)
+    return JSONResponse(status_code=503, content={"detail": DB_HELP})
 
 
-for r in (auth.router, catalog.router, orders.router, admin.router):
+@app.exception_handler(SQLAlchemyError)
+async def db_error(_: Request, exc: SQLAlchemyError):
+    log.exception("SQL xatosi", exc_info=exc)
+    return JSONResponse(status_code=500, content={"detail": "Bazada xatolik yuz berdi"})
+
+
+for r in (auth.router, warehouses.router, categories.router, products.router, movements.router):
     app.include_router(r, prefix="/api")
 
 
-@app.get("/api/health", tags=["System"])
+@app.get("/api/health", tags=["Tizim"])
 def health():
-    return {"status": "ok"}
+    """Server va baza holati (Vercel’da sozlamani tekshirish uchun)."""
+    if not settings.database_configured:
+        return JSONResponse(status_code=503, content={"status": "error", "database": "not_configured", "detail": DB_HELP})
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("select 1"))
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse(status_code=503, content={"status": "error", "database": type(e).__name__, "detail": DB_HELP})
+    return {"status": "ok", "database": "ok"}
 
 
-# Serve the built React app (frontend/dist) in production.
+# Production: React build (frontend/dist) ni shu server ko'rsatadi.
 dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"
-if dist.exists():
+if (dist / "index.html").exists():
     app.mount("/assets", StaticFiles(directory=dist / "assets"), name="assets")
 
     @app.get("/{path:path}", include_in_schema=False)

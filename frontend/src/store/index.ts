@@ -1,18 +1,16 @@
 import { configureStore } from '@reduxjs/toolkit';
 import auth from './authSlice';
-import cart from './cartSlice';
 import ui from './uiSlice';
 import { save } from '../lib/storage';
 
-export const store = configureStore({ reducer: { auth, cart, ui } });
+export const store = configureStore({ reducer: { auth, ui } });
 
-// auth va savatni localStorage'da saqlash
-let prev = store.getState();
+// Kirish ma'lumotini localStorage'da saqlash
+let prev = store.getState().auth;
 store.subscribe(() => {
-  const s = store.getState();
-  if (s.auth !== prev.auth) save('auth', s.auth);
-  if (s.cart !== prev.cart) save('cart', s.cart);
-  prev = s;
+  const { auth: a } = store.getState();
+  if (a !== prev) save('auth', a);
+  prev = a;
 });
 
 export type RootState = ReturnType<typeof store.getState>;

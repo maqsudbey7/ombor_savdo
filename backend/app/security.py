@@ -2,13 +2,13 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Path, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from .config import settings
 from .database import get_db
-from .models import Role, User
+from .models import User, Warehouse
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -22,31 +22,32 @@ def verify_password(password: str, hashed: str) -> bool:
 
 
 def create_token(user: User) -> str:
-    payload = {
-        "sub": str(user.id),
-        "role": user.role.value,
-        "exp": datetime.now(timezone.utc) + timedelta(days=settings.jwt_expire_days),
-    }
+    payload = {"sub": str(user.id), "exp": datetime.now(timezone.utc) + timedelta(days=settings.jwt_expire_days)}
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
 
 def get_current_user(
     creds: HTTPAuthorizationCredentials | None = Depends(bearer), db: Session = Depends(get_db)
 ) -> User:
-    unauthorized = HTTPException(status.HTTP_401_UNAUTHORIZED, "Tizimga kiring", headers={"WWW-Authenticate": "Bearer"})
     if creds is None:
-        raise unauthorized
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Tizimga kiring", headers={"WWW-Authenticate": "Bearer"})
     try:
         payload = jwt.decode(creds.credentials, settings.jwt_secret, algorithms=["HS256"])
-    except jwt.PyJWTError:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sessiya tugagan, qayta kiring")
-    user = db.get(User, int(payload["sub"]))
+        user = db.get(User, int(payload["sub"]))
+    except (jwt.PyJWTError, KeyError, ValueError):
+        user = None
     if user is None:
-        raise unauthorized
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sessiya tugagan, qayta kiring")
     return user
 
 
-def require_admin(user: User = Depends(get_current_user)) -> User:
-    if user.role != Role.admin:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Ruxsat yo‘q")
-    return user
+def get_warehouse(
+    warehouse_id: int = Path(description="Ombor ID"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Warehouse:
+    """Faqat egasi o'z omboriga kira oladi — boshqa birovniki 404 qaytaradi."""
+    wh = db.get(Warehouse, warehouse_id)
+    if wh is None or wh.owner_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Ombor topilmadi")
+    return wh

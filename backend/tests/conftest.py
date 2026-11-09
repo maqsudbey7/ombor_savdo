@@ -5,6 +5,7 @@ os.environ.setdefault("DATABASE_URL", "postgresql+psycopg://ombor:ombor@localhos
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
+from app import database  # noqa: E402
 from app.database import Base, engine  # noqa: E402
 from app.main import app  # noqa: E402
 
@@ -12,24 +13,25 @@ from app.main import app  # noqa: E402
 @pytest.fixture()
 def client():
     Base.metadata.drop_all(engine)
-    with TestClient(app) as c:  # lifespan: create tables + seed
+    database._ready = False
+    with TestClient(app) as c:  # lifespan: jadvallar + demo ma'lumot
         yield c
     Base.metadata.drop_all(engine)
 
 
-def auth(c: TestClient, phone: str, password: str) -> dict:
-    r = c.post("/api/auth/login", json={"phone": phone, "password": password})
-    assert r.status_code == 200, r.text
+def register(c: TestClient, phone: str) -> dict:
+    r = c.post("/api/auth/register", json={"name": "Foydalanuvchi", "phone": phone, "password": "secret12"})
+    assert r.status_code == 201, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
 @pytest.fixture()
-def admin(client):
-    return auth(client, "+998900000000", "admin123")
+def user(client):
+    return register(client, "+998 91 111 22 33")
 
 
 @pytest.fixture()
-def customer(client):
-    r = client.post("/api/auth/register", json={"name": "Mijoz", "phone": "+998 91 111 22 33", "password": "secret12"})
+def wh(client, user):
+    r = client.post("/api/warehouses", headers=user, json={"name": "Test ombor", "color": "emerald"})
     assert r.status_code == 201
-    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+    return r.json()["id"]

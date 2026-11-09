@@ -1,13 +1,37 @@
-# 📦 OmborSavdo — ulgurji (omborlik) savdo platformasi
+# 📦 OmborSavdo — ombor hisobi tizimi
 
-Full-stack e-commerce: **FastAPI + PostgreSQL** backend va **React + TypeScript** frontend.
+Har bir foydalanuvchi **o‘z omborlarini** ochib, mahsulotlar, qoldiq va kirim-chiqim hisobini yuritadi.
+
+**Demo:** telefon `+998900000000`, parol `demo123` (yoki saytdagi “Demo’ni ko‘rish” tugmasi).
 
 | Qatlam | Texnologiyalar |
 |---|---|
 | Backend | Python, FastAPI, SQLAlchemy 2 ORM, PostgreSQL, Pydantic v2, JWT, bcrypt, pytest |
-| Frontend | React 19, TypeScript, Vite, Tailwind CSS, Redux Toolkit, TanStack Query, React Router |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS, Redux Toolkit, TanStack Query, Motion (animatsiyalar) |
 | API hujjati | Swagger UI — `/api/docs` |
-| Deploy | Vercel (frontend + FastAPI serverless funksiya) + Neon PostgreSQL |
+| Deploy | Vercel (frontend + FastAPI serverless) + Neon PostgreSQL |
+
+## Imkoniyatlar
+- 🏬 **Cheksiz omborlar** — har biri alohida, faqat egasiga ko‘rinadi
+- 📦 **Mahsulotlar** — SKU, kategoriya, o‘lchov birligi, tannarx/sotuv narxi, javon joylashuvi
+- ⬇️⬆️ **Kirim / chiqim** — qoldiq avtomatik hisoblanadi, ombordagidan ko‘p chiqim qilib bo‘lmaydi
+- 📋 **Inventarizatsiya** — haqiqiy sanoqni kiritish, farq tarixda saqlanadi
+- ⚠️ **Kam qolganlar** — minimal qoldiqdan tushgan mahsulotlar ogohlantiriladi
+- 📊 **Boshqaruv paneli** — ombor qiymati, 14 kunlik kirim-chiqim grafigi, kategoriyalar ulushi
+- 📑 **Excel’ga eksport** (CSV)
+- ✨ Animatsiyali zamonaviy dizayn, telefonda ham qulay
+
+---
+
+## 🚀 Vercel’ga joylash
+1. vercel.com → **Add New → Project** → GitHub’dagi `ombor_savdo` ni **Import**.
+2. **Application Preset: `Other`** (Services emas!) → **Deploy**.
+3. **Storage → Create Database → Neon** → loyihaga ulang (`DATABASE_URL` o‘zi qo‘shiladi).
+4. **Settings → Environment Variables** → `JWT_SECRET` = uzun tasodifiy matn.
+5. **Deployments → ⋯ → Redeploy**.
+
+Tekshirish: `https://<loyiha>.vercel.app/api/health` → `{"status":"ok","database":"ok"}`.
+Agar `"database":"not_configured"` chiqsa — 3-qadam bajarilmagan.
 
 ---
 
@@ -15,110 +39,73 @@ Full-stack e-commerce: **FastAPI + PostgreSQL** backend va **React + TypeScript*
 
 Kerak: **Python 3.11+**, **Node.js 20+**, **PostgreSQL**.
 
-### 1) Alohida baza yaratish
-pgAdmin → Query Tool:
+**1. Baza** (pgAdmin → Query Tool):
 ```sql
 CREATE DATABASE ombor_savdo;
 ```
 
-### 2) Backend
+**2. Backend** (Git Bash):
 ```bash
 cd backend
 py -m venv .venv
-source .venv/Scripts/activate     # Git Bash. CMD da: .venv\Scripts\activate
+source .venv/Scripts/activate        # CMD: .venv\Scripts\activate
 python -m pip install -r requirements.txt
-```
-`backend/.env` faylini yarating (`.env.example` dan nusxa):
-```
-DATABASE_URL=postgresql+psycopg://postgres:PAROLINGIZ@localhost:5432/ombor_savdo
-JWT_SECRET=uzun-va-tasodifiy-maxfiy-kalit
-```
-> ⚠️ Parolda `#` bo'lsa, URL ichida **`%23`** deb yozing (`@` → `%40`), aks holda ulanish buziladi.
-> `postgresql+psycopg2://` yoki `postgresql://` ko'rinishidagi URL ham ishlaydi.
-
-Ishga tushirish:
-```bash
+cp .env.example .env                 # so‘ng DATABASE_URL ni o‘zingiznikiga o‘zgartiring
 python -m uvicorn app.main:app --reload --port 8000
 ```
-Jadvallar va 16 ta demo mahsulot avtomatik yaratiladi. Swagger: http://localhost:8000/api/docs
+> Parolda `#` bo‘lsa URL ichida `%23` deb yozing. `postgresql+psycopg2://…` formati ham ishlaydi.
 
-### 3) Frontend (yangi terminalda)
+**3. Frontend** (yangi terminal):
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-Sayt: **http://localhost:5173** · Admin: `+998900000000` / `admin123`
+Sayt: http://localhost:5173 · Swagger: http://localhost:8000/api/docs
+
+**Testlar:** `CREATE DATABASE ombor_test;` so‘ng
+`DATABASE_URL=postgresql+psycopg://postgres:PAROL@localhost:5432/ombor_test python -m pytest`
 
 ---
 
-## 🚀 Vercel'ga joylash
-
-Vercel `localhost` dagi bazaga ulana olmaydi, shuning uchun internetdagi bepul PostgreSQL (Neon) kerak.
-
-1. **vercel.com** → GitHub bilan kiring → **Add New → Project** → shu repozitoriyni **Import** qiling.
-   Sozlamalarni o'zgartirmang (`vercel.json` hammasini o'zi belgilaydi) → **Deploy**.
-2. Loyiha sahifasida **Storage → Create Database → Neon (Postgres)** → loyihaga ulang.
-   Vercel `DATABASE_URL` ni o'zi qo'shadi.
-3. **Settings → Environment Variables** ga qo'shing:
-   - `JWT_SECRET` — uzun tasodifiy matn
-   - `ADMIN_PASSWORD` — admin uchun yangi parol (ixtiyoriy)
-4. **Deployments → ⋯ → Redeploy**.
-
-Tayyor: `https://<loyiha>.vercel.app`, Swagger: `https://<loyiha>.vercel.app/api/docs`.
-Birinchi so'rovda jadvallar va demo ma'lumotlar Neon bazasida avtomatik yaratiladi.
-
----
-
-## 🧪 Testlar
-```sql
-CREATE DATABASE ombor_test;
+## Ma'lumotlar bazasi (One-to-Many)
 ```
-```bash
-cd backend
-DATABASE_URL=postgresql+psycopg://postgres:PAROLINGIZ@localhost:5432/ombor_test python -m pytest
+ombor_users 1──N ombor_warehouses 1──N ombor_categories
+                                  1──N ombor_products 1──N ombor_movements
 ```
+Jadvallar `ombor_` prefiksi bilan — bir bazada boshqa loyiha (masalan online_shop) jadvallari bilan to‘qnashmaydi.
 
----
+## API
+| Metod | Yo‘l | Vazifa |
+|---|---|---|
+| POST | `/api/auth/register`, `/api/auth/login` | Ro‘yxatdan o‘tish / kirish |
+| GET | `/api/auth/me` | Joriy foydalanuvchi |
+| GET / POST | `/api/warehouses` | Omborlarim (statistika bilan) / yangi ombor |
+| GET / PUT / DELETE | `/api/warehouses/{id}` | Ombor |
+| GET | `/api/warehouses/{id}/dashboard` | Boshqaruv paneli ma’lumotlari |
+| GET / POST / PUT / DELETE | `/api/warehouses/{id}/categories[/{cid}]` | Kategoriyalar |
+| GET / POST / PUT / DELETE | `/api/warehouses/{id}/products[/{pid}]` | Mahsulotlar (`q`, `category_id`, `stock`, `sort`) |
+| GET | `/api/warehouses/{id}/products/export` | CSV eksport |
+| GET / POST | `/api/warehouses/{id}/movements` | Kirim / chiqim / inventarizatsiya |
+| GET | `/api/health` | Server va baza holati |
+
+Status kodlar: `200`, `201`, `204`, `400`, `401`, `404`, `409` (qoldiq yetmaydi, SKU band), `422`, `503` (baza ulanmagan).
+Kirim-chiqimda mahsulot qatori `SELECT … FOR UPDATE` bilan bloklanadi — bir vaqtdagi ikki chiqim qoldiqni manfiy qila olmaydi.
 
 ## Loyiha tuzilmasi
 ```
-api/index.py          # Vercel Python funksiyasi (FastAPI'ni ulaydi)
-vercel.json           # Vercel: frontend build + /api → FastAPI
-requirements.txt      # Vercel uchun Python paketlar
-backend/
-  app/
-    main.py           # FastAPI ilova, CORS, xatolarni qayta ishlash
-    config.py         # .env sozlamalari (pydantic-settings)
-    database.py       # engine, sessiya, init_db
-    models.py         # SQLAlchemy modellari
-    schemas.py        # Pydantic sxemalari
-    security.py       # bcrypt, JWT, get_current_user, require_admin
-    seed.py           # demo ma'lumotlar
-    routers/          # auth, catalog, orders, admin
-  tests/              # pytest (8 ta test)
+api/index.py            Vercel Python funksiyasi
+vercel.json             Vercel sozlamasi (frontend build + /api → FastAPI)
+backend/app/
+  main.py               FastAPI, CORS, xatolarni qayta ishlash, /api/health
+  config.py database.py models.py schemas.py security.py seed.py
+  routers/              auth, warehouses, categories, products, movements
+backend/tests/          pytest
 frontend/src/
-  types/api.ts        # TypeScript interfeyslari
-  api/                # typed fetch klient
-  hooks/queries.ts    # TanStack Query
-  store/              # Redux Toolkit (auth, cart, ui)
-  components/ pages/ pages/admin/
+  types/api.ts          TypeScript interfeyslari
+  api/                  typed fetch klient
+  hooks/queries.ts      TanStack Query
+  store/                Redux Toolkit (auth, ui)
+  components/           AppLayout, Modal/Drawer, MovementModal, ProductDrawer…
+  pages/                Landing, Auth, Warehouses, warehouse/*
 ```
-
-## Ma'lumotlar bazasi (One-to-Many)
-`users` → `orders` · `categories` → `products` · `products` → `price_tiers` · `orders` → `order_items`
-
-## API
-| Metod | Yo'l | Vazifa |
-|---|---|---|
-| POST | `/api/auth/register`, `/api/auth/login` | Ro'yxatdan o'tish / kirish |
-| GET | `/api/auth/me` | Joriy foydalanuvchi |
-| GET | `/api/categories`, `/api/products`, `/api/products/{id}` | Katalog |
-| POST / GET | `/api/orders`, `/api/orders/my` | Buyurtmalar |
-| GET | `/api/admin/stats`, `/api/admin/customers` | Statistika, mijozlar |
-| GET / POST / PUT / DELETE | `/api/admin/products[/{id}]` | Mahsulot CRUD |
-| PATCH | `/api/admin/products/{id}/stock` | Qoldiqni o'zgartirish |
-| POST / DELETE | `/api/admin/categories[/{id}]` | Kategoriyalar |
-| GET / PATCH | `/api/admin/orders[/{id}]` | Buyurtma holati |
-
-Status kodlar: `200`, `201`, `204`, `400`, `401`, `403`, `404`, `409`, `422`.

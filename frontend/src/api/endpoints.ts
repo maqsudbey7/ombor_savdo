@@ -1,7 +1,7 @@
-import { qs, request } from './client';
+import { download, qs, request } from './client';
 import type {
-  AdminOrder, Category, Customer, LoginPayload, Order, OrderPayload, OrderStatus, Product, ProductFilters,
-  ProductPayload, RegisterPayload, Stats, TokenResponse, User,
+  Category, CategoryPayload, Dashboard, LoginPayload, Movement, MovementFilters, MovementPayload, Product,
+  ProductFilters, ProductPayload, RegisterPayload, TokenResponse, User, Warehouse, WarehousePayload, WarehouseSummary,
 } from '../types/api';
 
 export const authApi = {
@@ -10,27 +10,31 @@ export const authApi = {
   me: () => request<User>('/auth/me'),
 };
 
-export const catalogApi = {
-  categories: () => request<Category[]>('/categories'),
-  products: (f: ProductFilters = {}) => request<Product[]>(`/products${qs({ ...f })}`),
-  product: (id: number) => request<Product>(`/products/${id}`),
+export const warehousesApi = {
+  list: () => request<WarehouseSummary[]>('/warehouses'),
+  get: (id: number) => request<Warehouse>(`/warehouses/${id}`),
+  create: (data: WarehousePayload) => request<Warehouse>('/warehouses', 'POST', data),
+  update: (id: number, data: WarehousePayload) => request<Warehouse>(`/warehouses/${id}`, 'PUT', data),
+  remove: (id: number) => request<void>(`/warehouses/${id}`, 'DELETE'),
+  dashboard: (id: number) => request<Dashboard>(`/warehouses/${id}/dashboard`),
 };
 
-export const ordersApi = {
-  create: (data: OrderPayload) => request<Order>('/orders', 'POST', data),
-  my: () => request<Order[]>('/orders/my'),
+export const categoriesApi = {
+  list: (wid: number) => request<Category[]>(`/warehouses/${wid}/categories`),
+  create: (wid: number, data: CategoryPayload) => request<Category>(`/warehouses/${wid}/categories`, 'POST', data),
+  update: (wid: number, id: number, data: CategoryPayload) => request<Category>(`/warehouses/${wid}/categories/${id}`, 'PUT', data),
+  remove: (wid: number, id: number) => request<void>(`/warehouses/${wid}/categories/${id}`, 'DELETE'),
 };
 
-export const adminApi = {
-  stats: () => request<Stats>('/admin/stats'),
-  products: () => request<Product[]>('/admin/products'),
-  createProduct: (data: ProductPayload) => request<Product>('/admin/products', 'POST', data),
-  updateProduct: (id: number, data: ProductPayload) => request<Product>(`/admin/products/${id}`, 'PUT', data),
-  patchStock: (id: number, delta: number) => request<Product>(`/admin/products/${id}/stock`, 'PATCH', { delta }),
-  deleteProduct: (id: number) => request<void>(`/admin/products/${id}`, 'DELETE'),
-  createCategory: (data: { name: string; icon: string }) => request<Category>('/admin/categories', 'POST', data),
-  deleteCategory: (id: number) => request<void>(`/admin/categories/${id}`, 'DELETE'),
-  orders: (status?: OrderStatus) => request<AdminOrder[]>(`/admin/orders${qs({ status })}`),
-  setOrderStatus: (id: number, status: OrderStatus) => request<AdminOrder>(`/admin/orders/${id}`, 'PATCH', { status }),
-  customers: () => request<Customer[]>('/admin/customers'),
+export const productsApi = {
+  list: (wid: number, f: ProductFilters = {}) => request<Product[]>(`/warehouses/${wid}/products${qs({ ...f })}`),
+  create: (wid: number, data: ProductPayload) => request<Product>(`/warehouses/${wid}/products`, 'POST', data),
+  update: (wid: number, id: number, data: ProductPayload) => request<Product>(`/warehouses/${wid}/products/${id}`, 'PUT', data),
+  remove: (wid: number, id: number) => request<void>(`/warehouses/${wid}/products/${id}`, 'DELETE'),
+  exportCsv: (wid: number, name: string) => download(`/warehouses/${wid}/products/export`, `${name.replace(/[\\/:*?"<>|]/g, '')} - qoldiq.csv`),
+};
+
+export const movementsApi = {
+  list: (wid: number, f: MovementFilters = {}) => request<Movement[]>(`/warehouses/${wid}/movements${qs({ ...f })}`),
+  create: (wid: number, data: MovementPayload) => request<Movement>(`/warehouses/${wid}/movements`, 'POST', data),
 };

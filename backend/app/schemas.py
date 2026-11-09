@@ -1,9 +1,13 @@
 import re
 from datetime import date, datetime
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from .models import OrderStatus, PaymentMethod, Role
+from .models import MovementType
+
+COLORS = ("blue", "emerald", "amber", "rose", "violet", "cyan", "orange", "slate")
+Color = Literal["blue", "emerald", "amber", "rose", "violet", "cyan", "orange", "slate"]
 
 
 def normalize_phone(v: str) -> str:
@@ -21,7 +25,6 @@ class ORM(BaseModel):
 class RegisterIn(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     phone: str
-    company: str | None = Field(default=None, max_length=160)
     password: str = Field(min_length=6, max_length=128)
 
     _phone = field_validator("phone")(normalize_phone)
@@ -38,8 +41,6 @@ class UserOut(ORM):
     id: int
     name: str
     phone: str
-    company: str | None
-    role: Role
 
 
 class TokenOut(BaseModel):
@@ -48,158 +49,152 @@ class TokenOut(BaseModel):
     user: UserOut
 
 
-# ---------- Catalog ----------
-class CategoryIn(BaseModel):
+# ---------- Warehouses ----------
+class WarehouseIn(BaseModel):
     name: str = Field(min_length=2, max_length=120)
-    icon: str = Field(default="📦", max_length=16)
+    address: str = Field(default="", max_length=255)
+    description: str = Field(default="", max_length=1000)
+    color: Color = "blue"
+
+
+class WarehouseCreate(WarehouseIn):
+    with_sample: bool = Field(default=False, description="Namuna kategoriya va mahsulotlar bilan to‘ldirish")
+
+
+class WarehouseOut(ORM):
+    id: int
+    name: str
+    address: str
+    description: str
+    color: str
+    created_at: datetime
+
+
+class WarehouseSummary(WarehouseOut):
+    product_count: int
+    total_quantity: int
+    stock_value: int
+    low_stock_count: int
+    last_movement_at: datetime | None
+
+
+# ---------- Categories ----------
+class CategoryIn(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    color: Color = "slate"
 
 
 class CategoryOut(ORM):
     id: int
     name: str
-    slug: str
-    icon: str
+    color: str
     product_count: int = 0
 
 
 class CategoryBrief(ORM):
     id: int
     name: str
-    slug: str
-    icon: str
+    color: str
 
 
-class TierIn(BaseModel):
-    min_qty: int = Field(gt=0)
-    price: int = Field(gt=0)
-
-
-class TierOut(ORM):
-    min_qty: int
-    price: int
-
-
-class ProductIn(BaseModel):
+# ---------- Products ----------
+class ProductBase(BaseModel):
     name: str = Field(min_length=2, max_length=200)
     sku: str = Field(min_length=1, max_length=60)
-    description: str = ""
     category_id: int | None = None
-    image_url: str | None = Field(default=None, max_length=500)
     unit: str = Field(default="dona", min_length=1, max_length=20)
-    pack_size: int = Field(default=1, ge=1)
-    stock: int = Field(default=0, ge=0)
-    moq: int = Field(default=1, ge=1)
-    base_price: int = Field(gt=0)
-    is_active: bool = True
-    tiers: list[TierIn] = []
-
-    @model_validator(mode="after")
-    def check_tiers(self):
-        seen = set()
-        for t in self.tiers:
-            if t.min_qty in seen:
-                raise ValueError("Pog‘onalarda miqdor takrorlanmasligi kerak")
-            seen.add(t.min_qty)
-            if t.price >= self.base_price:
-                raise ValueError("Pog‘ona narxi asosiy narxdan past bo‘lishi kerak")
-        self.tiers.sort(key=lambda t: t.min_qty)
-        self.image_url = self.image_url or None
-        return self
+    cost_price: int = Field(default=0, ge=0)
+    sale_price: int = Field(default=0, ge=0)
+    min_quantity: int = Field(default=0, ge=0)
+    location: str = Field(default="", max_length=60)
+    description: str = Field(default="", max_length=2000)
 
 
-class StockPatch(BaseModel):
-    delta: int = Field(description="Qoldiqqa qo‘shiladigan (+) yoki ayriladigan (−) miqdor")
+class ProductCreate(ProductBase):
+    initial_quantity: int = Field(default=0, ge=0, description="Boshlang‘ich qoldiq (kirim sifatida yoziladi)")
+
+
+class ProductUpdate(ProductBase):
+    """Qoldiq bu yerda o‘zgarmaydi — faqat kirim/chiqim/inventarizatsiya orqali."""
 
 
 class ProductOut(ORM):
     id: int
     name: str
     sku: str
-    description: str
     category_id: int | None
     category: CategoryBrief | None
-    image_url: str | None
     unit: str
-    pack_size: int
-    stock: int
-    moq: int
-    base_price: int
-    is_active: bool
-    tiers: list[TierOut]
+    cost_price: int
+    sale_price: int
+    quantity: int
+    min_quantity: int
+    location: str
+    description: str
     created_at: datetime
+    updated_at: datetime
 
 
-# ---------- Orders ----------
-class OrderItemIn(BaseModel):
+# ---------- Movements ----------
+class MovementIn(BaseModel):
     product_id: int
-    qty: int = Field(gt=0)
+    type: MovementType
+    quantity: int = Field(ge=0, description="Kirim/chiqim miqdori yoki inventarizatsiyada haqiqiy sanoq")
+    price: int | None = Field(default=None, ge=0, description="Bo‘sh bo‘lsa mahsulot narxi olinadi")
+    counterparty: str = Field(default="", max_length=160)
+    note: str = Field(default="", max_length=500)
 
 
-class OrderIn(BaseModel):
-    items: list[OrderItemIn] = Field(min_length=1)
-    address: str = Field(min_length=5, max_length=500)
-    note: str | None = Field(default=None, max_length=500)
-    payment_method: PaymentMethod = PaymentMethod.cash
-
-
-class OrderItemOut(ORM):
+class MovementOut(ORM):
     id: int
     product_id: int | None
-    name: str
+    type: MovementType
+    product_name: str
     unit: str
-    qty: int
-    unit_price: int
-
-
-class OrderOut(ORM):
-    id: int
-    status: OrderStatus
-    total: int
-    address: str
-    note: str | None
-    payment_method: PaymentMethod
+    quantity: int
+    delta: int
+    balance_after: int
+    price: int
+    counterparty: str
+    note: str
     created_at: datetime
-    items: list[OrderItemOut]
 
 
-class AdminOrderOut(OrderOut):
-    user: UserOut
-
-
-class OrderStatusPatch(BaseModel):
-    status: OrderStatus
-
-
-# ---------- Admin ----------
-class DailySales(BaseModel):
+# ---------- Dashboard ----------
+class DailyFlow(BaseModel):
     day: date
-    total: int
-    count: int
+    in_qty: int
+    out_qty: int
+    in_value: int
+    out_value: int
 
 
-class LowStock(ORM):
+class CategoryShare(BaseModel):
+    name: str
+    color: str
+    product_count: int
+    stock_value: int
+
+
+class LowStockItem(ORM):
     id: int
     name: str
-    stock: int
+    sku: str
     unit: str
-    moq: int
+    quantity: int
+    min_quantity: int
 
 
-class StatsOut(BaseModel):
-    revenue: int
-    orders: int
-    new_orders: int
-    customers: int
-    products: int
-    low_stock: list[LowStock]
-    daily: list[DailySales]
-
-
-class CustomerOut(BaseModel):
-    id: int
-    name: str
-    phone: str
-    company: str | None
-    created_at: datetime
-    orders: int
-    spent: int
+class DashboardOut(BaseModel):
+    product_count: int
+    total_quantity: int
+    stock_value: int
+    potential_revenue: int
+    low_stock_count: int
+    out_of_stock_count: int
+    month_in_value: int
+    month_out_value: int
+    daily: list[DailyFlow]
+    low_stock: list[LowStockItem]
+    categories: list[CategoryShare]
+    recent: list[MovementOut]
