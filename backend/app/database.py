@@ -48,11 +48,36 @@ def ensure_db() -> None:
     from . import models  # noqa: F401
     from .seed import seed_demo, seed_demo_debts
 
-    Base.metadata.create_all(engine)  # yangi jadvallar (masalan qarzdorlik) mavjud bazaga ham qo'shiladi
+    Base.metadata.create_all(engine)  # yangi jadvallar mavjud bazaga ham qo'shiladi (eskilariga tegilmaydi)
+    run_migrations()
     with SessionLocal() as db:
         seed_demo(db)
         seed_demo_debts(db)
     _ready = True
+
+
+# --- Migratsiyalar: mavjud jadvallarga yangi ustunlar qo'shish (ma'lumotlar o'chirilmaydi) ---
+# Har bir qadam bir marta bajariladi va ombor_schema_migrations jadvalida belgilanadi.
+# Faqat "qo'shish" turidagi, qayta ishga tushirsa ham zararsiz (IF NOT EXISTS) buyruqlar.
+MIGRATIONS: list[tuple[int, str]] = [
+    (1, "ALTER TABLE ombor_users ADD COLUMN IF NOT EXISTS token_version INTEGER NOT NULL DEFAULT 0"),
+    (2, "ALTER TABLE ombor_users ADD COLUMN IF NOT EXISTS demo_reset_at TIMESTAMPTZ"),
+]
+
+
+def run_migrations() -> None:
+    from sqlalchemy import text
+
+    with engine.begin() as conn:
+        # Bir vaqtda ikkita serverless nusxa migratsiya qilmasligi uchun qulf
+        conn.execute(text("SELECT pg_advisory_xact_lock(724501)"))
+        conn.execute(text("CREATE TABLE IF NOT EXISTS ombor_schema_migrations (version INTEGER PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())"))
+        done = {r[0] for r in conn.execute(text("SELECT version FROM ombor_schema_migrations"))}
+        for version, sql in MIGRATIONS:
+            if version not in done:
+                conn.execute(text(sql))
+                conn.execute(text("INSERT INTO ombor_schema_migrations (version) VALUES (:v)"), {"v": version})
+                log.info("Migratsiya %s bajarildi", version)
 
 
 def try_init_db() -> None:

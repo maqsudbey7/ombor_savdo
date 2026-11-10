@@ -9,6 +9,12 @@ export const authApi = {
   login: (data: LoginPayload) => request<TokenResponse>('/auth/login', 'POST', data),
   register: (data: RegisterPayload) => request<TokenResponse>('/auth/register', 'POST', data),
   me: () => request<User>('/auth/me'),
+  updateProfile: (name: string) => request<User>('/auth/me', 'PUT', { name }),
+  changePassword: (current_password: string, new_password: string) =>
+    request<TokenResponse>('/auth/password', 'POST', { current_password, new_password }),
+  logoutAll: () => request<TokenResponse>('/auth/logout-all', 'POST'),
+  exportData: () => download('/auth/export'),
+  deleteAccount: (password: string) => request<void>('/auth/me', 'DELETE', { password }),
 };
 
 export const warehousesApi = {

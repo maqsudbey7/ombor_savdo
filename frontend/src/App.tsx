@@ -13,6 +13,7 @@ import Movements from './pages/warehouse/Movements';
 import Categories from './pages/warehouse/Categories';
 import Settings from './pages/warehouse/Settings';
 import Debts from './pages/warehouse/Debts';
+import Account from './pages/Account';
 import { useT } from './i18n';
 
 function NotFound() {
@@ -43,6 +44,7 @@ export default function App() {
       <Route path="royxatdan-otish" element={<Auth key="register" mode="register" />} />
       <Route path="omborlar" element={<AppLayout />}>
         <Route index element={<Warehouses />} />
+        <Route path="hisob" element={<Account />} />
         <Route path=":wid" element={<Dashboard />} />
         <Route path=":wid/mahsulotlar" element={<Products />} />
         <Route path=":wid/harakatlar" element={<Movements />} />

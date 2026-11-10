@@ -82,20 +82,48 @@ def fill_warehouse(db: Session, wh: Warehouse, user: User, products=SAMPLE_PRODU
         p.quantity = balance
 
 
+def _demo_warehouses(db: Session, user: User) -> None:
+    main = Warehouse(owner=user, name="Chilonzor markaziy ombori", address="Toshkent sh., Chilonzor tumani",
+                     description="Asosiy ulgurji ombor", color="blue")
+    branch = Warehouse(owner=user, name="Sergeli filiali", address="Toshkent sh., Sergeli tumani",
+                       description="Qurilish mollari ombori", color="emerald")
+    db.add_all([main, branch])
+    db.flush()
+    fill_warehouse(db, main, user, history_days=14)
+    fill_warehouse(db, branch, user, products=[p for p in SAMPLE_PRODUCTS if p[2] == "Qurilish mollari"], history_days=10)
+
+
+DEMO_RESET_EVERY = timedelta(minutes=30)
+
+
+def reset_demo_if_due(db: Session, user: User) -> None:
+    """Demo hisobga hamma kira oladi — kimdir buzib qo'ysa ham har 30 daqiqada asl holiga qaytadi."""
+    if user.phone != settings.demo_phone:
+        return
+    now = datetime.now(timezone.utc)
+    locked = db.scalar(select(User).where(User.id == user.id).with_for_update())
+    if locked.demo_reset_at and now - locked.demo_reset_at < DEMO_RESET_EVERY:
+        db.rollback()
+        return
+    for w in list(locked.warehouses):
+        db.delete(w)
+    db.flush()
+    _demo_warehouses(db, locked)
+    locked.demo_reset_at = now
+    db.commit()
+    seed_demo_debts(db)
+
+
 def seed_demo(db: Session) -> None:
     """Bo'sh bazaga demo hisob qo'shadi: 2 ta ombor, 14 kunlik harakatlar tarixi bilan."""
     if db.scalar(select(User.id).limit(1)):
         return
     try:
-        user = User(name="Demo foydalanuvchi", phone=settings.demo_phone, password_hash=hash_password(settings.demo_password))
-        main = Warehouse(owner=user, name="Chilonzor markaziy ombori", address="Toshkent sh., Chilonzor tumani",
-                         description="Asosiy ulgurji ombor", color="blue")
-        branch = Warehouse(owner=user, name="Sergeli filiali", address="Toshkent sh., Sergeli tumani",
-                           description="Qurilish mollari ombori", color="emerald")
-        db.add_all([user, main, branch])
+        user = User(name="Demo foydalanuvchi", phone=settings.demo_phone, password_hash=hash_password(settings.demo_password),
+                    demo_reset_at=datetime.now(timezone.utc))
+        db.add(user)
         db.flush()
-        fill_warehouse(db, main, user, history_days=14)
-        fill_warehouse(db, branch, user, products=[p for p in SAMPLE_PRODUCTS if p[2] == "Qurilish mollari"], history_days=10)
+        _demo_warehouses(db, user)
         db.commit()
     except IntegrityError:  # bir vaqtda ikkita serverless nusxa seed qilsa
         db.rollback()

@@ -29,9 +29,24 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(120))
     phone: Mapped[str] = mapped_column(String(20), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(100))
+    # Parol o'zgarsa yoki "barcha qurilmalardan chiqish" bosilsa oshadi — eski tokenlar yaroqsiz bo'ladi
+    token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    demo_reset_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     warehouses: Mapped[list["Warehouse"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
+
+
+class LoginAttempt(Base):
+    """Kirish urinishlari — parolni terib topishga (brute-force) qarshi cheklov uchun."""
+
+    __tablename__ = "ombor_login_attempts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    phone: Mapped[str] = mapped_column(String(20), index=True)
+    ip: Mapped[str] = mapped_column(String(64), index=True)
+    success: Mapped[bool] = mapped_column(default=False)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
 
 class Warehouse(Base):

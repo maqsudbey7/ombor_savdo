@@ -31,9 +31,22 @@ class ORM(BaseModel):
 class RegisterIn(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     phone: str
-    password: str = Field(min_length=6, max_length=128)
+    password: str = Field(min_length=1, max_length=128)  # qoidasi routerda (tushunarli xabar bilan)
 
     _phone = field_validator("phone")(normalize_phone)
+
+
+class ProfileIn(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+
+
+class PasswordChangeIn(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=1, max_length=128)
+
+
+class PasswordConfirmIn(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
 
 
 class LoginIn(BaseModel):

@@ -21,9 +21,9 @@ const uiSlice = createSlice({
 export const { toastAdded, toastRemoved, setSidebarOpen, setLang } = uiSlice.actions;
 export default uiSlice.reducer;
 
-/** Thunk: toast ko‘rsatib, 3.5 soniyadan so‘ng yashiradi. */
+/** Thunk: toast ko‘rsatib, 3.5 (xato bo'lsa 6) soniyadan so‘ng yashiradi. */
 export const toast = (message: string, type: Toast['type'] = 'ok') => (dispatch: AppDispatch) => {
   const id = nanoid();
   dispatch(toastAdded({ id, message, type }));
-  setTimeout(() => dispatch(toastRemoved(id)), 3500);
+  setTimeout(() => dispatch(toastRemoved(id)), type === 'err' ? 6000 : 3500);
 };

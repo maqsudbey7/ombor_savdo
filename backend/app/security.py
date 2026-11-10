@@ -22,8 +22,14 @@ def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode(), hashed.encode())
 
 
+def password_ok(p: str) -> bool:
+    """Kamida 8 belgi, harf ham, raqam ham bo'lsin."""
+    return len(p) >= 8 and any(c.isalpha() for c in p) and any(c.isdigit() for c in p)
+
+
 def create_token(user: User) -> str:
-    payload = {"sub": str(user.id), "exp": datetime.now(timezone.utc) + timedelta(days=settings.jwt_expire_days)}
+    payload = {"sub": str(user.id), "ver": user.token_version or 0,
+               "exp": datetime.now(timezone.utc) + timedelta(days=settings.jwt_expire_days)}
     return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
 
 
@@ -35,6 +41,9 @@ def get_current_user(
     try:
         payload = jwt.decode(creds.credentials, settings.jwt_secret, algorithms=["HS256"])
         user = db.get(User, int(payload["sub"]))
+        # Parol o'zgargan yoki "barcha qurilmalardan chiqish" bosilgan bo'lsa — eski token ishlamaydi
+        if user is not None and payload.get("ver", 0) != (user.token_version or 0):
+            user = None
     except (jwt.PyJWTError, KeyError, ValueError):
         user = None
     if user is None:

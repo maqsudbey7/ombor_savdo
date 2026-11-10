@@ -11,6 +11,7 @@ import { Drawer, ErrorBox, Field, Modal, Skeleton } from './ui';
 import { CustomerPicker, DuePicker } from './DebtFields';
 import { buildReminder, isCustomerChosen, toCustomerRef, type CustomerChoice } from '../lib/debts';
 import { useDebtActions } from './useDebtActions';
+import { confirmAsk } from './feedback';
 
 // ---------- Holat belgisi ----------
 const STATUS_CLS: Record<Debt['status'], string> = {
@@ -351,7 +352,7 @@ function CustomerBody({ wid, customerId, shop, onClose }: { wid: number; custome
           <div className="flex gap-1">
             <button className="icon-btn" title={t('cd.edit')} aria-label={t('cd.edit')} onClick={() => setEdit(true)}><Pencil size={17} /></button>
             <button className="icon-btn hover:bg-rose-50 hover:text-rose-600" title={t('cd.delete')} aria-label={t('cd.delete')}
-              onClick={() => { if (confirm(t('cd.confirmDelete', { name: c.name }))) delCustomer.mutate(c.id, { onSuccess: onClose }); }}><Trash2 size={17} /></button>
+              onClick={async () => { if (await confirmAsk({ text: t('cd.confirmDelete', { name: c.name }) })) delCustomer.mutate(c.id, { onSuccess: onClose }); }}><Trash2 size={17} /></button>
           </div>
         </div>
       )}

@@ -2,7 +2,8 @@ import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import { motion } from 'motion/react';
-import { CheckCircle2, PlayCircle } from 'lucide-react';
+import { CheckCircle2, PlayCircle, ShieldCheck } from 'lucide-react';
+import { PasswordInput, passwordScore } from '../components/feedback';
 import { authApi } from '../api/endpoints';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { loggedIn } from '../store/authSlice';
@@ -60,11 +61,15 @@ export default function Auth({ mode }: { mode: 'login' | 'register' }) {
             <h1 className="text-3xl font-extrabold tracking-tight">{isReg ? t('auth.regTitle') : t('auth.loginTitle')}</h1>
             <p className="mt-1.5 text-slate-500">{isReg ? t('auth.regSub') : t('auth.loginSub')}</p>
           </div>
-          {isReg && <label className="block"><span className="label">{t('auth.name')}</span><input id="name" required minLength={2} className="input py-3" value={form.name} onChange={ch('name')} /></label>}
-          <label className="block"><span className="label">{t('auth.phone')}</span><input id="phone" required type="tel" className="input py-3" value={form.phone} onChange={ch('phone')} placeholder="+998 90 123 45 67" /></label>
-          <label className="block"><span className="label">{t('auth.password')}</span><input id="password" required type="password" minLength={6} className="input py-3" value={form.password} onChange={ch('password')} placeholder={t('auth.passwordPh')} /></label>
+          {isReg && <label className="block"><span className="label">{t('auth.name')}</span><input id="name" required minLength={2} autoComplete="name" className="input py-3" value={form.name} onChange={ch('name')} /></label>}
+          <label className="block"><span className="label">{t('auth.phone')}</span><input id="phone" required type="tel" autoComplete="tel" className="input py-3" value={form.phone} onChange={ch('phone')} placeholder="+998 90 123 45 67" /></label>
+          <label className="block"><span className="label">{t('auth.password')}</span>
+            <PasswordInput id="password" value={form.password} onChange={(v) => setForm({ ...form, password: v })} meter={isReg}
+              autoComplete={isReg ? 'new-password' : 'current-password'} placeholder={isReg ? t('auth.passwordPhNew') : t('auth.passwordPh')} />
+          </label>
           {mutation.error && <ErrorBox error={mutation.error} />}
-          <button disabled={mutation.isPending} className="btn-primary w-full py-3.5 text-base">{mutation.isPending ? t('common.wait') : isReg ? t('auth.register') : t('auth.login')}</button>
+          {isReg && <p className="flex items-start gap-2 text-xs text-slate-500"><ShieldCheck size={15} className="mt-px shrink-0 text-emerald-600" /> {t('auth.secure')}</p>}
+          <button disabled={mutation.isPending || (isReg && passwordScore(form.password) === 0)} className="btn-primary w-full py-3.5 text-base">{mutation.isPending ? t('common.wait') : isReg ? t('auth.register') : t('auth.login')}</button>
           <div className="relative py-2 text-center text-xs text-slate-400 before:absolute before:inset-x-0 before:top-1/2 before:h-px before:bg-slate-200"><span className="relative bg-slate-50 px-3">{t('common.or')}</span></div>
           <button type="button" onClick={() => demo.mutate()} disabled={demo.isPending} className="btn-ghost w-full py-3"><PlayCircle size={18} /> {demo.isPending ? t('land.demoLoading') : t('auth.demo')}</button>
           <p className="pt-2 text-center text-sm text-slate-500">

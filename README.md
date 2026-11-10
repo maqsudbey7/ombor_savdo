@@ -109,3 +109,13 @@ frontend/src/
   components/           AppLayout, Modal/Drawer, MovementModal, ProductDrawer…
   pages/                Landing, Auth, Warehouses, warehouse/*
 ```
+
+## Xavfsizlik va ma'lumotlar saqlanishi
+- Parollar faqat **bcrypt** xeshi ko‘rinishida saqlanadi; yangi parol: kamida 8 belgi, harf va raqam.
+- Kirishda cheklov: bitta raqamga 15 daqiqada 5 ta, bitta IP'ga 20 ta xato urinish (`429`).
+- Parol almashtirilsa yoki “Barcha qurilmalardan chiqish” bosilsa — eski tokenlar darhol yaroqsiz (`token_version`).
+- Har bir foydalanuvchi faqat o‘z omborlarini ko‘radi (boshqasiniki — `404`).
+- Ma'lumotlar Neon PostgreSQL'da: sayt yangilanganda (deploy) **o‘chmaydi**. Sxema o‘zgarishlari `ombor_schema_migrations` orqali faqat qo‘shimcha (ALTER … ADD COLUMN IF NOT EXISTS) — hech qachon jadval o‘chirilmaydi.
+- “Hisobim” sahifasida: zaxira nusxa (JSON), parolni almashtirish, barcha qurilmalardan chiqish, hisobni o‘chirish.
+- Demo hisob har 30 daqiqada asl holiga qaytadi; demo'da parol/profilni o‘zgartirib bo‘lmaydi.
+- Xavfsizlik sarlavhalari (nosniff, X-Frame-Options, HSTS, Referrer-Policy) va tushunarli xato xabarlari (o‘zbek/rus).

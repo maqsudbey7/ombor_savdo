@@ -150,3 +150,80 @@ def test_demo_has_debts(client):
     wid = client.get("/api/warehouses", headers=h).json()[0]["id"]
     s = client.get(f"/api/warehouses/{wid}/debts/summary", headers=h).json()
     assert s["overdue_count"] == 1 and s["due_today_count"] == 1 and s["debtors_count"] == 4
+
+
+# ---------- Xavfsizlik ----------
+def test_weak_password_rejected(client):
+    r = client.post("/api/auth/register", json={"name": "Ali", "phone": "+998901234567", "password": "123"})
+    assert r.status_code == 422 and "8" in r.json()["detail"]
+
+
+def test_friendly_validation_message(client):
+    r = client.post("/api/auth/register", json={"name": "A", "phone": "+998901234567", "password": "secret12"})
+    assert r.status_code == 422
+    assert r.json()["detail"] == "«Nomi» kamida 2 ta belgi bo‘lsin"
+    r = client.post("/api/auth/register", headers={"Accept-Language": "ru"}, json={"name": "A", "phone": "+998901234567", "password": "secret12"})
+    assert "Название" in r.json()["detail"]
+
+
+def test_password_hashed_and_security_headers(client, user):
+    from app.database import SessionLocal
+    from app.models import User
+    with SessionLocal() as db:
+        u = db.query(User).filter(User.phone == "+998911112233").one()
+        assert u.password_hash.startswith("$2") and "secret12" not in u.password_hash
+    r = client.get("/api/auth/me", headers=user)
+    assert r.headers["x-content-type-options"] == "nosniff"
+    assert r.headers["cache-control"] == "no-store"
+
+
+def test_login_rate_limit(client, user):
+    for _ in range(5):
+        assert client.post("/api/auth/login", json={"phone": "+998911112233", "password": "xato1234"}).status_code == 401
+    r = client.post("/api/auth/login", json={"phone": "+998911112233", "password": "secret12"})
+    assert r.status_code == 429 and "daqiqa" in r.json()["detail"]
+
+
+def test_change_password_revokes_old_tokens(client, user):
+    r = client.post("/api/auth/password", headers=user, json={"current_password": "noto'g'ri1", "new_password": "yangiParol9"})
+    assert r.status_code == 400
+    r = client.post("/api/auth/password", headers=user, json={"current_password": "secret12", "new_password": "yangiParol9"})
+    assert r.status_code == 200
+    new = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    assert client.get("/api/auth/me", headers=user).status_code == 401      # eski token endi ishlamaydi
+    assert client.get("/api/auth/me", headers=new).status_code == 200
+    assert client.post("/api/auth/login", json={"phone": "+998911112233", "password": "yangiParol9"}).status_code == 200
+
+
+def test_logout_all(client, user):
+    r = client.post("/api/auth/logout-all", headers=user)
+    assert r.status_code == 200
+    assert client.get("/api/auth/me", headers=user).status_code == 401
+
+
+def test_export_and_delete_account(client, user, wh):
+    r = client.get("/api/auth/export", headers=user)
+    assert r.status_code == 200 and "attachment" in r.headers["content-disposition"]
+    assert r.json()["warehouses"][0]["name"] == "Test ombor"
+    assert client.request("DELETE", "/api/auth/me", headers=user, json={"password": "xato"}).status_code == 400
+    assert client.request("DELETE", "/api/auth/me", headers=user, json={"password": "secret12"}).status_code == 204
+    assert client.get("/api/auth/me", headers=user).status_code == 401
+
+
+def test_demo_protected_and_resets(client):
+    r = client.post("/api/auth/login", json={"phone": "+998900000000", "password": "demo123"})
+    demo = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    assert client.post("/api/auth/password", headers=demo, json={"current_password": "demo123", "new_password": "boshqa123"}).status_code == 403
+    whs = client.get("/api/warehouses", headers=demo).json()
+    for w in whs:
+        client.delete(f"/api/warehouses/{w['id']}", headers=demo)
+    assert client.get("/api/warehouses", headers=demo).json() == []
+    from datetime import datetime, timedelta, timezone
+    from app.database import SessionLocal
+    from app.models import User
+    with SessionLocal() as db:
+        u = db.query(User).filter(User.phone == "+998900000000").one()
+        u.demo_reset_at = datetime.now(timezone.utc) - timedelta(hours=1)
+        db.commit()
+    client.post("/api/auth/login", json={"phone": "+998900000000", "password": "demo123"})
+    assert len(client.get("/api/warehouses", headers=demo).json()) == 2

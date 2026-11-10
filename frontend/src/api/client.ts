@@ -1,5 +1,6 @@
 import { store } from '../store';
 import { logout } from '../store/authSlice';
+import { toast } from '../store/uiSlice';
 import { translate } from '../i18n';
 
 export class ApiError extends Error {
@@ -22,15 +23,25 @@ async function send(path: string, method: Method, body?: unknown): Promise<Respo
   const headers = authHeaders();
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   let res: Response;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 30_000);
   try {
-    res = await fetch(`/api${path}`, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
-  } catch {
-    throw new ApiError(0, translate(store.getState().ui.lang, 'err.network'));
+    res = await fetch(`/api${path}`, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined, signal: ctrl.signal });
+  } catch (e) {
+    const lang = store.getState().ui.lang;
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+    throw new ApiError(0, translate(lang, (e as Error)?.name === 'AbortError' && !offline ? 'err.timeout' : 'err.network'));
+  } finally {
+    clearTimeout(timer);
   }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    if (res.status === 401 && headers.Authorization) store.dispatch(logout());
     const lang = store.getState().ui.lang;
+    // Token eskirgan (parol almashgan, boshqa qurilmadan "hammasidan chiqish") — tushunarli xabar bilan chiqaramiz
+    if (res.status === 401 && headers.Authorization && store.getState().auth.token) {
+      store.dispatch(logout());
+      store.dispatch(toast(translate(lang, 'err.sessionExpired'), 'err'));
+    }
     const detail = typeof data.detail === 'string' ? data.detail : translate(lang, res.status >= 500 ? 'err.server' : 'err.generic');
     throw new ApiError(res.status, detail);
   }
@@ -45,8 +56,11 @@ export async function request<T>(path: string, method: Method = 'GET', body?: un
 }
 
 /** Faylni yuklab olish (masalan CSV eksport). */
-export async function download(path: string, filename: string): Promise<void> {
-  const blob = await (await send(path, 'GET')).blob();
+export async function download(path: string, filename?: string): Promise<void> {
+  const res = await send(path, 'GET');
+  const fromHeader = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1];
+  filename = filename ?? fromHeader ?? 'download';
+  const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = Object.assign(document.createElement('a'), { href: url, download: filename });
   document.body.appendChild(a);

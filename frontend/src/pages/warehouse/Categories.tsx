@@ -9,6 +9,7 @@ import { ColorPicker, Empty, ErrorBox, Field, Modal, Skeleton } from '../../comp
 import { useT } from '../../i18n';
 import PageHeader from './Header';
 import { useWid } from './useWid';
+import { confirmAsk } from '../../components/feedback';
 
 function CategoryForm({ wid, category, onDone }: { wid: number; category?: Category; onDone: () => void }) {
   const [name, setName] = useState(category?.name ?? '');
@@ -32,7 +33,7 @@ export default function Categories() {
   const remove = useDeleteCategory(wid);
   const [editing, setEditing] = useState<Category | 'new' | null>(null);
   const t = useT();
-  const del = (c: Category) => { if (confirm(t('cat.confirmDelete', { name: c.name }))) remove.mutate(c.id); };
+  const del = async (c: Category) => { if (await confirmAsk({ text: t('cat.confirmDelete', { name: c.name }) })) remove.mutate(c.id); };
 
   return (
     <div className="space-y-6">

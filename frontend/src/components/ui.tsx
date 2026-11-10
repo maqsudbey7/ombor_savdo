@@ -58,7 +58,7 @@ export const ErrorBox = ({ error, className = '' }: { error: Error; className?: 
 export function Toasts() {
   const toasts = useAppSelector((s) => s.ui.toasts);
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-20 z-[70] flex flex-col items-center gap-2 px-4 md:bottom-6">
+    <div className="pointer-events-none fixed inset-x-0 bottom-24 z-[70] flex flex-col items-center gap-2 px-4 md:bottom-6">
       <AnimatePresence>
         {toasts.map((t) => (
           <motion.div key={t.id} layout initial={{ opacity: 0, y: 24, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }}

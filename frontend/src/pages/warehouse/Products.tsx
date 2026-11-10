@@ -14,6 +14,7 @@ import ProductDrawer from '../../components/ProductDrawer';
 import MovementModal from '../../components/MovementModal';
 import PageHeader from './Header';
 import { useWid } from './useWid';
+import { confirmAsk } from '../../components/feedback';
 
 const TABS: [StockFilter, TKey][] = [['all', 'common.all'], ['low', 'prod.tabLow'], ['out', 'prod.tabOut']];
 const SORTS: ProductSort[] = ['name', 'new', 'qty_asc', 'qty_desc', 'value_desc'];
@@ -43,7 +44,7 @@ export default function Products() {
     catch (e) { dispatch(toast((e as Error).message, 'err')); }
     finally { setExporting(false); }
   };
-  const del = (p: Product) => { if (confirm(t('prod.confirmDelete', { name: p.name }))) remove.mutate(p.id); };
+  const del = async (p: Product) => { if (await confirmAsk({ text: t('prod.confirmDelete', { name: p.name }) })) remove.mutate(p.id); };
   const list = products.data ?? [];
   const totalValue = list.reduce((s, p) => s + p.quantity * p.cost_price, 0);
 
