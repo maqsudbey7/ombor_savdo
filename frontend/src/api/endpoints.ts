@@ -22,7 +22,7 @@ export const warehousesApi = {
   get: (id: number) => request<Warehouse>(`/warehouses/${id}`),
   create: (data: WarehousePayload) => request<Warehouse>('/warehouses', 'POST', data),
   update: (id: number, data: WarehousePayload) => request<Warehouse>(`/warehouses/${id}`, 'PUT', data),
-  remove: (id: number) => request<void>(`/warehouses/${id}`, 'DELETE'),
+  remove: ({ id, password }: { id: number; password: string }) => request<void>(`/warehouses/${id}`, 'DELETE', { password }),
   dashboard: (id: number) => request<Dashboard>(`/warehouses/${id}/dashboard`),
 };
 

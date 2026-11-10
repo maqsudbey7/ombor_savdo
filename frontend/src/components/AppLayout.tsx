@@ -11,7 +11,7 @@ import { logout } from '../store/authSlice';
 import { setSidebarOpen } from '../store/uiSlice';
 import { COLORS } from '../lib/format';
 import { DEMO } from '../hooks/useDemoLogin';
-import { LangSwitch, Logo, Skeleton, Toasts } from './ui';
+import { LangSwitch, Logo, Skeleton, ThemeSwitch, Toasts } from './ui';
 import { OfflineBanner } from './feedback';
 import NotificationBell from './NotificationBell';
 import { useT, type TKey } from '../i18n';
@@ -98,7 +98,7 @@ function Sidebar({ onNewWarehouse, onLogout }: { onNewWarehouse: () => void; onL
       </nav>
 
       <div className="space-y-2 border-t border-slate-100 p-3">
-        <div className="flex justify-center"><LangSwitch /></div>
+        <div className="flex items-center justify-between gap-2 px-1"><LangSwitch /><ThemeSwitch /></div>
         <div className="flex items-center gap-1">
           <NavLink to="/omborlar/hisob" onClick={close} className={({ isActive }) => `flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-2 transition ${isActive ? 'bg-brand-50' : 'hover:bg-slate-100'}`}>
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-600 text-sm font-bold text-white">{user?.name[0]?.toUpperCase()}</span>

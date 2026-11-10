@@ -9,9 +9,12 @@ import { loggedIn, userLoaded } from '../store/authSlice';
 import { toast } from '../store/uiSlice';
 import { useT } from '../i18n';
 import { DEMO } from '../hooks/useDemoLogin';
-import { ErrorBox, LangSwitch } from '../components/ui';
+import { ErrorBox, LangSwitch, ThemeSwitch } from '../components/ui';
+import { useWarehouses } from '../hooks/queries';
 import { PasswordInput, passwordScore } from '../components/feedback';
 import { promptInstall, useInstall } from '../lib/pwa';
+
+const initials = (n: string) => n.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('');
 
 function Section({ icon: Icon, title, children, danger }: { icon: LucideIcon; title: string; children: ReactNode; danger?: boolean }) {
   return (
@@ -31,6 +34,7 @@ export default function Account() {
   const t = useT();
   const demo = user.phone === DEMO.phone;
   const install = useInstall();
+  const whs = useWarehouses();
 
   const [name, setName] = useState(user.name);
   const profile = useMutation({
@@ -67,13 +71,26 @@ export default function Account() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <div className="flex items-center gap-4">
-        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-brand-600 text-xl font-bold text-white">{user.name[0]?.toUpperCase()}</span>
-        <div className="min-w-0">
-          <h1 className="truncate text-2xl font-extrabold tracking-tight sm:text-3xl">{t('acc.title')}</h1>
-          <p className="text-sm text-slate-500">{t('acc.sub')}</p>
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-500 via-brand-700 to-violet-700 p-6 text-white shadow-glow sm:p-8">
+        <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/10 blur-2xl" />
+        <div className="absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-violet-400/30 blur-3xl" />
+        <div className="relative flex items-center gap-4 sm:gap-5">
+          <span className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white/15 text-2xl font-extrabold ring-1 ring-white/25 backdrop-blur sm:h-20 sm:w-20 sm:text-3xl">
+            {initials(user.name)}
+          </span>
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-wider text-white/70">{t('acc.title')}</div>
+            <h1 className="truncate text-2xl font-extrabold tracking-tight sm:text-3xl">{user.name}</h1>
+            <div className="mt-0.5 text-sm text-white/80">{user.phone}</div>
+          </div>
         </div>
-      </div>
+        <div className="relative mt-5 flex flex-wrap gap-2 text-xs font-semibold">
+          <span className="rounded-full bg-white/15 px-3 py-1 ring-1 ring-white/20">{t('acc.stats', { w: whs.data?.length ?? '…' })}</span>
+          <span className="flex items-center gap-1 rounded-full bg-emerald-400/25 px-3 py-1 ring-1 ring-emerald-300/30"><ShieldCheck size={13} /> {t('acc.safeTitle')}</span>
+          {demo && <span className="rounded-full bg-amber-400/30 px-3 py-1 ring-1 ring-amber-300/30">Demo</span>}
+        </div>
+      </motion.div>
 
       <div className="rounded-2xl bg-emerald-50 p-5 ring-1 ring-emerald-100">
         <div className="flex items-center gap-2 font-bold text-emerald-800"><ShieldCheck size={19} /> {t('acc.safeTitle')}</div>
@@ -131,7 +148,9 @@ export default function Account() {
       </Section>
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <Section icon={Languages} title={t('acc.lang')}><LangSwitch /></Section>
+        <Section icon={Languages} title={`${t('acc.lang')} · ${t('theme.title')}`}>
+          <div className="flex flex-wrap items-center gap-3"><LangSwitch /><ThemeSwitch labels /></div>
+        </Section>
         <Section icon={Smartphone} title={t('acc.app')}>
           {install.installed ? <p className="text-sm font-medium text-emerald-600">✓ {t('acc.installed')}</p> : (
             <>

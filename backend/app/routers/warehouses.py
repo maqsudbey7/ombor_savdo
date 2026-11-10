@@ -7,8 +7,9 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Category, Movement, MovementType, Product, User, Warehouse
 from ..schemas import (CategoryShare, DailyFlow, DashboardOut, LowStockItem, MovementOut, WarehouseCreate, WarehouseIn,
-                       WarehouseOut, WarehouseSummary)
-from ..security import get_current_user, get_warehouse
+                       PasswordConfirmIn, WarehouseOut, WarehouseSummary)
+from ..i18n import http_error
+from ..security import get_current_user, get_warehouse, verify_password
 
 router = APIRouter(prefix="/warehouses", tags=["Omborlar"])
 
@@ -65,7 +66,10 @@ def update_warehouse(data: WarehouseIn, wh: Warehouse = Depends(get_warehouse), 
 
 
 @router.delete("/{warehouse_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_warehouse(wh: Warehouse = Depends(get_warehouse), db: Session = Depends(get_db)):
+def delete_warehouse(data: PasswordConfirmIn, wh: Warehouse = Depends(get_warehouse), db: Session = Depends(get_db)):
+    """Omborni o'chirish — tasodifan yoki begona odam o'chirib yubormasligi uchun kirish paroli so'raladi."""
+    if not verify_password(data.password, wh.owner.password_hash):
+        raise http_error(status.HTTP_400_BAD_REQUEST, "wrong_password_short")
     db.delete(wh)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

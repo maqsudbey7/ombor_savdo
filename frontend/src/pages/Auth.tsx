@@ -8,7 +8,7 @@ import { authApi } from '../api/endpoints';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { loggedIn } from '../store/authSlice';
 import { useDemoLogin } from '../hooks/useDemoLogin';
-import { ErrorBox, LangSwitch, Logo, Toasts } from '../components/ui';
+import { ErrorBox, LangSwitch, Logo, ThemeSwitch, Toasts } from '../components/ui';
 import { useT, type TKey } from '../i18n';
 
 export default function Auth({ mode }: { mode: 'login' | 'register' }) {
@@ -55,7 +55,7 @@ export default function Auth({ mode }: { mode: 'login' | 'register' }) {
         <motion.form onSubmit={submit} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-sm space-y-4">
           <div className="mb-8 flex items-center justify-between">
             <Link to="/" className="lg:invisible"><Logo /></Link>
-            <LangSwitch />
+            <div className="flex items-center gap-2"><ThemeSwitch /><LangSwitch /></div>
           </div>
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight">{isReg ? t('auth.regTitle') : t('auth.loginTitle')}</h1>

@@ -1,9 +1,12 @@
 import { useState, type FormEvent } from 'react';
 import { useCategories, useSaveProduct } from '../hooks/queries';
-import { UNITS } from '../lib/format';
+import { money } from '../lib/format';
+import { ChevronDown } from 'lucide-react';
 import type { Product, ProductPayload } from '../types/api';
 import { Drawer, ErrorBox, Field } from './ui';
-import { useT } from '../i18n';
+import { useT, type TKey } from '../i18n';
+
+const QUICK_UNITS = ['dona', 'kg', 'litr', 'metr', 'quti', 'qop', 'paket', 'blok'];
 
 interface Props { wid: number; open: boolean; onClose: () => void; product?: Product }
 
@@ -43,33 +46,103 @@ function ProductForm({ wid, product, onDone }: { wid: number; product?: Product;
     save.mutate({ id: product?.id, data }, { onSuccess: onDone });
   };
 
+  const unitLabel = f.unit.trim() || 'dona';
+  const customUnit = !QUICK_UNITS.includes(f.unit);
+  const [more, setMore] = useState(!!product && !!(product.category_id || product.location || product.description));
+  const [other, setOther] = useState(customUnit && f.unit !== '');
+  const min = Number(f.min_quantity) || 0;
+  const profit = Number(f.sale_price) - Number(f.cost_price);
+
+  const step = (n: number, title: string) => (
+    <div className="flex items-center gap-2.5 text-sm font-bold">
+      <span className="grid h-6 w-6 place-items-center rounded-full bg-brand-600 text-xs text-white">{n}</span>{title}
+    </div>
+  );
+
   return (
-    <form onSubmit={submit} className="space-y-4">
-      <Field label={t('pd.name')}><input autoFocus required minLength={2} className="input" value={f.name} onChange={set('name')} placeholder={t('pd.namePh')} /></Field>
-      <div className="grid grid-cols-2 gap-4">
-        <Field label={t('pd.sku')}><input required className="input font-mono" value={f.sku} onChange={set('sku')} /></Field>
-        <Field label={t('pd.category')}>
-          <select className="input" value={f.category_id} onChange={set('category_id')}>
-            <option value="">{t('pd.noCategory')}</option>
-            {cats.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </Field>
-        <Field label={t('pd.unit')}>
-          <input className="input" list="units" value={f.unit} onChange={set('unit')} />
-          <datalist id="units">{UNITS.map((u) => <option key={u} value={u} />)}</datalist>
-        </Field>
-        <Field label={t('pd.location')}><input className="input" value={f.location} onChange={set('location')} placeholder="A-3" /></Field>
-        <Field label={t('pd.cost')}><input type="number" min={0} className="input" value={f.cost_price} onChange={set('cost_price')} placeholder="0" /></Field>
-        <Field label={t('pd.sale')} hint={margin !== null ? t('pd.margin', { n: margin }) : undefined}><input type="number" min={0} className="input" value={f.sale_price} onChange={set('sale_price')} placeholder="0" /></Field>
-        <Field label={t('pd.min')} hint={t('pd.minHint')}><input type="number" min={0} className="input" value={f.min_quantity} onChange={set('min_quantity')} /></Field>
-        {!product && <Field label={t('pd.initial')} hint={t('pd.initialHint')}><input type="number" min={0} className="input" value={f.initial_quantity} onChange={set('initial_quantity')} /></Field>}
+    <form onSubmit={submit} className="space-y-6">
+      <section className="space-y-3">
+        {step(1, t('pd.step1'))}
+        <Field label={t('pd.name')}><input autoFocus required minLength={2} className="input py-3 text-base" value={f.name} onChange={set('name')} placeholder={t('pd.namePh')} /></Field>
+        <div>
+          <span className="label">{t('pd.unit')}</span>
+          <div className="flex flex-wrap gap-2">
+            {QUICK_UNITS.map((u) => (
+              <button key={u} type="button" onClick={() => { setOther(false); setF((s) => ({ ...s, unit: u })); }}
+                className={`rounded-xl px-3.5 py-2 text-sm font-semibold ring-1 transition ${!other && f.unit === u ? 'bg-brand-600 text-white ring-brand-600' : 'bg-white text-slate-600 ring-slate-200 hover:ring-brand-300'}`}>
+                {t(`unit.${u}` as TKey)}
+              </button>
+            ))}
+            <button type="button" onClick={() => { setOther(true); setF((s) => ({ ...s, unit: '' })); }}
+              className={`rounded-xl px-3.5 py-2 text-sm font-semibold ring-1 transition ${other ? 'bg-brand-600 text-white ring-brand-600' : 'bg-white text-slate-600 ring-slate-200 hover:ring-brand-300'}`}>
+              {t('pd.unitOther')}
+            </button>
+          </div>
+          {other && <input autoFocus required className="input mt-2" value={f.unit} onChange={set('unit')} placeholder={t('pd.unitPh')} maxLength={20} />}
+        </div>
+      </section>
+
+      <section className="space-y-3">
+        {step(2, t('pd.step2'))}
+        <div className="grid grid-cols-2 gap-3">
+          {!product && (
+            <Field label={t('pd.initial')}>
+              <div className="relative">
+                <input type="number" min={0} inputMode="numeric" className="input py-3 pr-16 text-lg font-semibold" value={f.initial_quantity} onChange={set('initial_quantity')} onFocus={(e) => e.target.select()} />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">{unitLabel}</span>
+              </div>
+            </Field>
+          )}
+          <Field label={t('pd.min')}>
+            <div className="relative">
+              <input type="number" min={0} inputMode="numeric" className="input py-3 pr-16 text-lg font-semibold" value={f.min_quantity} onChange={set('min_quantity')} onFocus={(e) => e.target.select()} />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">{unitLabel}</span>
+            </div>
+          </Field>
+        </div>
+        <p className="rounded-xl bg-amber-50 px-3.5 py-2.5 text-xs text-amber-800 ring-1 ring-amber-100">
+          {min > 0 ? t('pd.lowPreview', { m: min, u: unitLabel }) : t('pd.noLow')}
+          {!product && <><br /><span className="text-amber-700/80">{t('pd.initialHint')}</span></>}
+        </p>
+        {product && <p className="rounded-xl bg-slate-50 px-3.5 py-2.5 text-xs text-slate-500">{t('pd.stockNote')}</p>}
+      </section>
+
+      <section className="space-y-3">
+        {step(3, t('pd.step3'))}
+        <div className="grid grid-cols-2 gap-3">
+          <Field label={t('pd.cost', { u: unitLabel })}><input type="number" min={0} inputMode="numeric" className="input" value={f.cost_price} onChange={set('cost_price')} placeholder="0" /></Field>
+          <Field label={t('pd.sale', { u: unitLabel })}><input type="number" min={0} inputMode="numeric" className="input" value={f.sale_price} onChange={set('sale_price')} placeholder="0" /></Field>
+        </div>
+        {Number(f.sale_price) > 0 && Number(f.cost_price) > 0 && (
+          <p className={`text-xs font-medium ${profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+            {t('pd.profit', { v: money(profit) })}{margin !== null && ` · ${t('pd.margin', { n: margin })}`}
+          </p>
+        )}
+      </section>
+
+      <div className="rounded-2xl ring-1 ring-slate-200">
+        <button type="button" onClick={() => setMore(!more)} className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-semibold text-slate-600">
+          {t('pd.more')} <ChevronDown size={18} className={`transition ${more ? 'rotate-180' : ''}`} />
+        </button>
+        {more && (
+          <div className="grid grid-cols-2 gap-3 border-t border-slate-100 p-4">
+            <Field label={t('pd.category')}>
+              <select className="input" value={f.category_id} onChange={set('category_id')}>
+                <option value="">{t('pd.noCategory')}</option>
+                {cats.data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </Field>
+            <Field label={t('pd.location')}><input className="input" value={f.location} onChange={set('location')} placeholder={t('pd.locationPh')} /></Field>
+            <div className="col-span-2"><Field label={t('pd.sku')}><input required className="input font-mono" value={f.sku} onChange={set('sku')} /></Field></div>
+            <div className="col-span-2"><Field label={t('common.note')}><textarea rows={2} className="input" value={f.description} onChange={set('description')} placeholder={t('pd.notePh')} /></Field></div>
+          </div>
+        )}
       </div>
-      <Field label={t('common.note')}><textarea rows={3} className="input" value={f.description} onChange={set('description')} /></Field>
-      {product && <p className="rounded-xl bg-slate-50 px-4 py-3 text-xs text-slate-500">{t('pd.stockNote')}</p>}
+
       {save.error && <ErrorBox error={save.error} />}
-      <div className="flex gap-3 pt-2">
-        <button type="button" onClick={onDone} className="btn-ghost flex-1">{t('common.cancel')}</button>
-        <button disabled={save.isPending} className="btn-primary flex-1">{save.isPending ? t('common.saving') : t('common.save')}</button>
+      <div className="sticky bottom-0 -mx-6 -mb-6 flex gap-3 border-t border-slate-100 bg-white px-6 py-4">
+        <button type="button" onClick={onDone} className="btn-ghost flex-1 py-3">{t('common.cancel')}</button>
+        <button disabled={save.isPending || !f.unit.trim()} className="btn-primary flex-1 py-3">{save.isPending ? t('common.saving') : t('common.save')}</button>
       </div>
     </form>
   );

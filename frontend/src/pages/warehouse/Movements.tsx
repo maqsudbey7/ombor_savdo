@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'motion/react';
-import { ArrowDownToLine, ArrowUpFromLine, ClipboardCheck, History } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, ClipboardCheck, History, Trash2 } from 'lucide-react';
 import { useMovements } from '../../hooks/queries';
 import { money, num } from '../../lib/format';
 import { translate, useLang, useT, type Lang, type TKey } from '../../i18n';
@@ -85,8 +85,8 @@ export default function Movements() {
                   <div key={m.id} className="flex flex-wrap items-center gap-3 px-4 py-3 sm:flex-nowrap">
                     <MovementIcon type={m.type} />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold">{m.product_name}{m.product_id === null && <span className="ml-1 text-xs font-normal text-slate-400">{t('mvp.deleted')}</span>}
-                        {m.debt_id && <span className="badge ml-2 bg-amber-50 align-middle text-[10px] text-amber-700 ring-1 ring-amber-200">{t('mvp.credit')}</span>}</div>
+                      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1"><span className={`truncate text-sm font-semibold ${m.product_id === null ? 'text-slate-500' : ''}`}>{m.product_name}</span>{m.product_id === null && <span className="badge bg-slate-100 align-middle text-[10px] text-slate-500 ring-1 ring-slate-200"><Trash2 size={10} /> {t('mvp.deletedBadge')}</span>}
+                        {m.debt_id && <span className="badge bg-amber-50 align-middle text-[10px] text-amber-700 ring-1 ring-amber-200">{t('mvp.credit')}</span>}</div>
                       <div className="truncate text-xs text-slate-400">
                         {new Date(m.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })} · {t(`mv.${m.type}`)}
                         {m.counterparty && ` · ${m.counterparty}`}{m.note && ` · ${m.note}`}

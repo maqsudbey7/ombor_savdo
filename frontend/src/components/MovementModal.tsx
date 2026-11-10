@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { ArrowDownToLine, ArrowRight, ArrowUpFromLine, ClipboardCheck, HandCoins, Search } from 'lucide-react';
+import { ArrowDownToLine, ArrowRight, ArrowUpFromLine, ClipboardCheck, HandCoins, Info, Search } from 'lucide-react';
 import { useCreateMovement, useProducts } from '../hooks/queries';
 import { useAppDispatch } from '../store/hooks';
 import { toast } from '../store/uiSlice';
@@ -128,13 +128,23 @@ function MovementForm({ wid, initialType, initialProduct, onDone }: { wid: numbe
         </motion.div>
       )}
 
+      {type === 'adjust' && (
+        <div className="flex gap-3 rounded-2xl bg-amber-50 p-4 text-sm ring-1 ring-amber-100">
+          <Info size={18} className="mt-0.5 shrink-0 text-amber-600" />
+          <div><div className="font-semibold text-amber-900">{t('mm.adjustHelpT')}</div><p className="mt-0.5 text-amber-800/90">{t('mm.adjustHelp')}</p></div>
+        </div>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={type === 'adjust' ? t('mm.count') : t('mm.qty')}>
+        <Field label={type === 'adjust' ? t('mm.count') : t('mm.qty')}
+          hint={type === 'adjust' && product && qty !== '' ? t('mm.diff', { d: `${after - product.quantity > 0 ? '+' : ''}${num(after - product.quantity)} ${product.unit}` }) : undefined}>
           <input required type="number" min={type === 'adjust' ? 0 : 1} inputMode="numeric" className="input text-lg font-semibold" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="0" />
         </Field>
-        <Field label={t('mm.price')} hint={product ? t('mm.priceHint', { v: money(defaultPrice) }) : undefined}>
-          <input type="number" min={0} className="input" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={product ? String(defaultPrice) : ''} />
-        </Field>
+        {type !== 'adjust' && (
+          <Field label={t('mm.price')} hint={product ? t('mm.priceHint', { v: money(defaultPrice) }) : undefined}>
+            <input type="number" min={0} className="input" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={product ? String(defaultPrice) : ''} />
+          </Field>
+        )}
         {type !== 'adjust' && !isCredit && (
           <Field label={type === 'in' ? t('mm.supplier') : t('mm.customer')}>
             <input className="input" value={counterparty} onChange={(e) => setCounterparty(e.target.value)} placeholder={type === 'in' ? t('mm.supplierPh') : t('mm.customerPh')} />

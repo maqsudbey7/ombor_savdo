@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, animate, motion, useInView } from 'motion/react';
-import { AlertCircle, CheckCircle2, Warehouse as WarehouseIcon, X, type LucideProps } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Monitor, Moon, Sun, Warehouse as WarehouseIcon, X, type LucideProps } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
-import { setLang } from '../store/uiSlice';
+import { setLang, setTheme, type Theme } from '../store/uiSlice';
 import { LANGS, useT } from '../i18n';
 import { COLORS, COLOR_KEYS, num } from '../lib/format';
 import type { Color, Product } from '../types/api';
@@ -201,6 +201,27 @@ export function LangSwitch({ dark = false }: { dark?: boolean }) {
           className={`relative rounded-md px-2.5 py-1 transition ${lang === l.code ? (dark ? 'text-ink-950' : 'text-slate-900') : dark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}>
           {lang === l.code && <motion.span layoutId={`lang-${dark ? 'd' : 'l'}`} className="absolute inset-0 rounded-md bg-white shadow-sm" transition={{ type: 'spring', stiffness: 500, damping: 35 }} />}
           <span className="relative">{l.short}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ---------- Tungi / kunduzgi rejim ----------
+const THEMES: { v: Theme; icon: typeof Sun; key: 'theme.light' | 'theme.dark' | 'theme.system' }[] = [
+  { v: 'light', icon: Sun, key: 'theme.light' }, { v: 'dark', icon: Moon, key: 'theme.dark' }, { v: 'system', icon: Monitor, key: 'theme.system' },
+];
+export function ThemeSwitch({ labels = false }: { labels?: boolean }) {
+  const theme = useAppSelector((s) => s.ui.theme);
+  const dispatch = useAppDispatch();
+  const t = useT();
+  return (
+    <div className="inline-flex rounded-lg bg-slate-100 p-0.5 text-xs font-bold" role="group" aria-label={t('theme.title')}>
+      {THEMES.map(({ v, icon: Icon, key }) => (
+        <button key={v} type="button" title={t(key)} aria-label={t(key)} aria-pressed={theme === v} onClick={() => dispatch(setTheme(v))}
+          className={`relative flex items-center gap-1.5 rounded-md px-2.5 py-1 transition ${theme === v ? 'text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}>
+          {theme === v && <motion.span layoutId={`theme-${labels ? 'l' : 's'}`} className="absolute inset-0 rounded-md bg-white shadow-sm" transition={{ type: 'spring', stiffness: 500, damping: 35 }} />}
+          <Icon size={14} className="relative" />{labels && <span className="relative">{t(key)}</span>}
         </button>
       ))}
     </div>

@@ -66,7 +66,8 @@ def test_product_crud_and_movements(client, user, wh):
     assert client.delete(f"{base}/products/{pid}", headers=user).status_code == 204
     hist = client.get(f"{base}/movements", headers=user).json()
     assert len(hist) == 4 and hist[0]["product_id"] is None  # tarix saqlanadi
-    assert client.delete(f"{base}", headers=user).status_code == 204
+    assert client.request("DELETE", base, headers=user, json={"password": "xato"}).status_code == 400
+    assert client.request("DELETE", base, headers=user, json={"password": "secret12"}).status_code == 204
     assert client.get(f"{base}", headers=user).status_code == 404
 
 
@@ -216,7 +217,7 @@ def test_demo_protected_and_resets(client):
     assert client.post("/api/auth/password", headers=demo, json={"current_password": "demo123", "new_password": "boshqa123"}).status_code == 403
     whs = client.get("/api/warehouses", headers=demo).json()
     for w in whs:
-        client.delete(f"/api/warehouses/{w['id']}", headers=demo)
+        assert client.request("DELETE", f"/api/warehouses/{w['id']}", headers=demo, json={"password": "demo123"}).status_code == 204
     assert client.get("/api/warehouses", headers=demo).json() == []
     from datetime import datetime, timedelta, timezone
     from app.database import SessionLocal

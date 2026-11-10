@@ -6,6 +6,7 @@ import { COLORS, fmtDate } from '../../lib/format';
 import { ErrorBox, Spinner } from '../../components/ui';
 import { useT } from '../../i18n';
 import WarehouseModal from '../../components/WarehouseModal';
+import { PasswordInput } from '../../components/feedback';
 import PageHeader from './Header';
 import { useWid } from './useWid';
 
@@ -15,7 +16,7 @@ export default function Settings() {
   const remove = useDeleteWarehouse();
   const nav = useNavigate();
   const [editing, setEditing] = useState(false);
-  const [confirmName, setConfirmName] = useState('');
+  const [pw, setPw] = useState('');
   const t = useT();
 
   if (isPending) return <Spinner />;
@@ -42,14 +43,15 @@ export default function Settings() {
       <div className="card border border-rose-100 p-6">
         <h2 className="flex items-center gap-2 font-bold text-rose-600"><AlertTriangle size={18} /> {t('set.danger')}</h2>
         <p className="mt-1 text-sm text-slate-500">{t('set.dangerText')}</p>
-        <label className="mt-4 block max-w-sm">
-          <span className="label">{t('set.confirm')} <b>{wh.name}</b></span>
-          <input className="input" value={confirmName} onChange={(e) => setConfirmName(e.target.value)} />
-        </label>
-        <button className="btn mt-4 bg-rose-600 text-white hover:bg-rose-700" disabled={confirmName !== wh.name || remove.isPending}
-          onClick={() => remove.mutate(wid, { onSuccess: () => nav('/omborlar') })}>
-          <Trash2 size={16} /> {t('set.delete')}
-        </button>
+        <form className="mt-4 max-w-sm space-y-3" onSubmit={(e) => { e.preventDefault(); remove.mutate({ id: wid, password: pw }, { onSuccess: () => nav('/omborlar') }); }}>
+          <label className="block">
+            <span className="label">{t('set.confirm')}</span>
+            <PasswordInput className="" value={pw} onChange={setPw} autoComplete="current-password" placeholder={t('set.pwPh')} />
+          </label>
+          <button className="btn bg-rose-600 text-white hover:bg-rose-700" disabled={!pw || remove.isPending}>
+            <Trash2 size={16} /> {remove.isPending ? t('common.wait') : t('set.delete')}
+          </button>
+        </form>
       </div>
       <WarehouseModal open={editing} onClose={() => setEditing(false)} warehouse={wh} />
     </div>

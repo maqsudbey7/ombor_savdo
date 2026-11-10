@@ -10,6 +10,16 @@ export const store = configureStore({ reducer: { auth, ui } });
 // Kirish ma'lumoti va tilni localStorage'da saqlash
 let prev = store.getState();
 document.documentElement.lang = prev.ui.lang;
+
+// Tungi / kunduzgi rejim: <html class="dark">
+const media = window.matchMedia('(prefers-color-scheme: dark)');
+function applyTheme(theme: string) {
+  const dark = theme === 'dark' || (theme === 'system' && media.matches);
+  document.documentElement.classList.toggle('dark', dark);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0b1120' : '#2145ee');
+}
+applyTheme(prev.ui.theme);
+media.addEventListener?.('change', () => applyTheme(store.getState().ui.theme));
 store.subscribe(() => {
   const s = store.getState();
   if (s.auth !== prev.auth) {
@@ -19,6 +29,10 @@ store.subscribe(() => {
       queryClient.clear();
       clearUserData();
     }
+  }
+  if (s.ui.theme !== prev.ui.theme) {
+    try { localStorage.setItem('theme', s.ui.theme); } catch { /* storage yo'q */ }
+    applyTheme(s.ui.theme);
   }
   if (s.ui.lang !== prev.ui.lang) {
     try { localStorage.setItem('lang', s.ui.lang); } catch { /* storage yo'q */ }

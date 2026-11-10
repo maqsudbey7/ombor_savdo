@@ -43,6 +43,7 @@ MESSAGES: dict[str, dict[str, str]] = {
     "weak_password": {"uz": "Parol kamida 8 ta belgidan iborat bo‘lib, harf va raqam qatnashishi kerak",
                       "ru": "Пароль должен быть не короче 8 символов и содержать буквы и цифры"},
     "wrong_password": {"uz": "Joriy parol noto‘g‘ri", "ru": "Текущий пароль неверный"},
+    "wrong_password_short": {"uz": "Parol noto‘g‘ri", "ru": "Неверный пароль"},
     "same_password": {"uz": "Yangi parol eskisidan farq qilishi kerak", "ru": "Новый пароль должен отличаться от старого"},
     "too_many_attempts": {"uz": "Juda ko‘p noto‘g‘ri urinish. {m} daqiqadan so‘ng qayta urinib ko‘ring",
                           "ru": "Слишком много неудачных попыток. Попробуйте через {m} мин."},

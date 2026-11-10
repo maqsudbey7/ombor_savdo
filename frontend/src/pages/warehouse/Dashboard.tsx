@@ -150,7 +150,7 @@ export default function Dashboard() {
                 {d.recent.map((m) => (
                   <div key={m.id} className="flex items-center gap-3 py-3">
                     <MovementIcon type={m.type} />
-                    <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{m.product_name}</div><div className="truncate text-xs text-slate-400">{t(`mv.${m.type}`)}{m.debt_id && ` · ${t('mvp.credit')}`}{m.counterparty && ` · ${m.counterparty}`} · {timeAgo(m.created_at)}</div></div>
+                    <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{m.product_name}{m.product_id === null && <span className="badge ml-1.5 bg-slate-100 align-middle text-[10px] text-slate-500">{t('mvp.deletedBadge')}</span>}</div><div className="truncate text-xs text-slate-400">{t(`mv.${m.type}`)}{m.debt_id && ` · ${t('mvp.credit')}`}{m.counterparty && ` · ${m.counterparty}`} · {timeAgo(m.created_at)}</div></div>
                     <div className="text-right"><div className={`text-sm font-bold tabular-nums ${m.delta > 0 ? 'text-emerald-600' : m.delta < 0 ? 'text-rose-600' : 'text-slate-500'}`}>{m.delta > 0 ? '+' : ''}{num(m.delta)} {m.unit}</div><div className="text-xs text-slate-400">{money(m.quantity * m.price)}</div></div>
                   </div>
                 ))}
