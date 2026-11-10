@@ -1,6 +1,7 @@
 import type { Color, MovementType } from '../types/api';
 import { store } from '../store';
-import { dateLocale, translate, type TKey } from '../i18n';
+import { translate, type TKey } from '../i18n';
+import { longDate } from '../i18n/dates';
 
 // Joriy til (formatlash funksiyalari komponentdan tashqarida ham ishlashi uchun store'dan o'qiladi)
 const lang = () => store.getState().ui.lang;
@@ -29,10 +30,7 @@ export const fmtDate = (iso: string) =>
 export const fmtDay = (d: string) => d.split('-').reverse().join('.');
 
 /** 10-noyabr / 10 ноября */
-export const fmtDayLong = (d: string | Date, withYear = false) =>
-  new Date(typeof d === 'string' && d.length === 10 ? `${d}T12:00:00` : d).toLocaleDateString(dateLocale(lang()), {
-    day: 'numeric', month: 'long', ...(withYear ? { year: 'numeric' } : {}),
-  });
+export const fmtDayLong = (d: string | Date, withYear = false) => longDate(lang(), d, withYear);
 
 export function timeAgo(iso: string): string {
   const s = (Date.now() - new Date(iso).getTime()) / 1000;

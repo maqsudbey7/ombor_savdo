@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Boxes, ChevronRight, HandCoins, PackageX, TrendingUp, Wallet } from 'lucide-react';
 import { useDashboard, useDebtSummary } from '../../hooks/queries';
-import { dateLocale, useLang, useT } from '../../i18n';
+import { useLang, useT } from '../../i18n';
+import { longDate } from '../../i18n/dates';
 import { COLORS, MOVEMENT_STYLE, money, moneyShort, num, timeAgo } from '../../lib/format';
 import type { MovementType } from '../../types/api';
 import { CountUp, ErrorBox, Skeleton } from '../../components/ui';
@@ -35,7 +36,7 @@ function FlowChart({ daily }: { daily: { day: string; in_qty: number; out_qty: n
             {hover === i && (
               <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
                 className={`pointer-events-none absolute bottom-full z-10 mb-2 w-44 rounded-xl bg-ink-900 p-3 text-xs text-white shadow-xl ${i > daily.length / 2 ? 'right-0' : 'left-0'}`}>
-                <div className="mb-1.5 font-semibold">{new Date(`${d.day}T12:00:00`).toLocaleDateString(dateLocale(lang), { day: 'numeric', month: 'long' })}</div>
+                <div className="mb-1.5 font-semibold">{longDate(lang, d.day, false)}</div>
                 <div className="flex justify-between"><span className="text-emerald-300">{t('mv.in')}</span><span>{moneyShort(d.in_value)}</span></div>
                 <div className="flex justify-between"><span className="text-rose-300">{t('mv.out')}</span><span>{moneyShort(d.out_value)}</span></div>
               </motion.div>

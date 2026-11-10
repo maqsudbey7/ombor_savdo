@@ -37,5 +37,3 @@ export function detectLang(): Lang {
   return typeof navigator !== 'undefined' && navigator.language?.toLowerCase().startsWith('ru') ? 'ru' : 'uz';
 }
 
-/** Sanalar uchun brauzer lokali. */
-export const dateLocale = (lang: Lang) => (lang === 'ru' ? 'ru-RU' : 'uz-Latn-UZ');

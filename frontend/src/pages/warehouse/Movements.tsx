@@ -3,7 +3,8 @@ import { motion } from 'motion/react';
 import { ArrowDownToLine, ArrowUpFromLine, ClipboardCheck, History } from 'lucide-react';
 import { useMovements } from '../../hooks/queries';
 import { money, num } from '../../lib/format';
-import { dateLocale, translate, useLang, useT, type Lang, type TKey } from '../../i18n';
+import { translate, useLang, useT, type Lang, type TKey } from '../../i18n';
+import { longDate } from '../../i18n/dates';
 import type { Movement, MovementType } from '../../types/api';
 import { Empty, ErrorBox, Skeleton } from '../../components/ui';
 import MovementModal from '../../components/MovementModal';
@@ -19,7 +20,7 @@ function dayLabel(iso: string, lang: Lang) {
   const y = new Date(Date.now() - 864e5);
   if (d.toDateString() === today.toDateString()) return translate(lang, 'common.today');
   if (d.toDateString() === y.toDateString()) return translate(lang, 'common.yesterday');
-  return d.toLocaleDateString(dateLocale(lang), { day: 'numeric', month: 'long', year: 'numeric' });
+  return longDate(lang, d);
 }
 
 export default function Movements() {
