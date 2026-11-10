@@ -31,3 +31,4 @@
     linear-gradient(to bottom, rgb(255 255 255 / .06) 1px, transparent 1px);
   background-size: 40px 40px;
 }
+@keyframes wiggle { 0%, 100% { transform: rotate(0); } 20% { transform: rotate(14deg); } 40% { transform: rotate(-12deg); } 60% { transform: rotate(8deg); } 80% { transform: rotate(-4deg); } }

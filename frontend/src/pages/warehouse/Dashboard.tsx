@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Boxes, PackageX, TrendingUp, Wallet } from 'lucide-react';
-import { useDashboard } from '../../hooks/queries';
-import { COLORS, MOVEMENT, money, moneyShort, num, timeAgo } from '../../lib/format';
+import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Boxes, ChevronRight, HandCoins, PackageX, TrendingUp, Wallet } from 'lucide-react';
+import { useDashboard, useDebtSummary } from '../../hooks/queries';
+import { dateLocale, useLang, useT } from '../../i18n';
+import { COLORS, MOVEMENT_STYLE, money, moneyShort, num, timeAgo } from '../../lib/format';
 import type { MovementType } from '../../types/api';
 import { CountUp, ErrorBox, Skeleton } from '../../components/ui';
 import { stagger } from '../../lib/motion';
@@ -13,11 +14,13 @@ import { useWid } from './useWid';
 
 export function MovementIcon({ type }: { type: MovementType }) {
   const Icon = type === 'in' ? ArrowDownToLine : type === 'out' ? ArrowUpFromLine : Boxes;
-  return <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ring-1 ${MOVEMENT[type].cls}`}><Icon size={16} /></span>;
+  return <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ring-1 ${MOVEMENT_STYLE[type].cls}`}><Icon size={16} /></span>;
 }
 
 function FlowChart({ daily }: { daily: { day: string; in_qty: number; out_qty: number; in_value: number; out_value: number }[] }) {
   const [hover, setHover] = useState<number | null>(null);
+  const t = useT();
+  const lang = useLang();
   const max = Math.max(1, ...daily.flatMap((d) => [d.in_value, d.out_value]));
   return (
     <div>
@@ -32,9 +35,9 @@ function FlowChart({ daily }: { daily: { day: string; in_qty: number; out_qty: n
             {hover === i && (
               <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
                 className={`pointer-events-none absolute bottom-full z-10 mb-2 w-44 rounded-xl bg-ink-900 p-3 text-xs text-white shadow-xl ${i > daily.length / 2 ? 'right-0' : 'left-0'}`}>
-                <div className="mb-1.5 font-semibold">{new Date(d.day).toLocaleDateString('ru-RU', { day: '2-digit', month: 'long' })}</div>
-                <div className="flex justify-between"><span className="text-emerald-300">Kirim</span><span>{moneyShort(d.in_value)}</span></div>
-                <div className="flex justify-between"><span className="text-rose-300">Chiqim</span><span>{moneyShort(d.out_value)}</span></div>
+                <div className="mb-1.5 font-semibold">{new Date(`${d.day}T12:00:00`).toLocaleDateString(dateLocale(lang), { day: 'numeric', month: 'long' })}</div>
+                <div className="flex justify-between"><span className="text-emerald-300">{t('mv.in')}</span><span>{moneyShort(d.in_value)}</span></div>
+                <div className="flex justify-between"><span className="text-rose-300">{t('mv.out')}</span><span>{moneyShort(d.out_value)}</span></div>
               </motion.div>
             )}
           </div>
@@ -49,17 +52,19 @@ export default function Dashboard() {
   const wid = useWid();
   const { data: d, isPending, error } = useDashboard(wid);
   const [mv, setMv] = useState<MovementType | null>(null);
+  const t = useT();
+  const debts = useDebtSummary(wid).data;
 
   const actions = (
     <>
-      <button className="btn-in" onClick={() => setMv('in')}><ArrowDownToLine size={18} /> Kirim</button>
-      <button className="btn-out" onClick={() => setMv('out')}><ArrowUpFromLine size={18} /> Chiqim</button>
+      <button className="btn-in" onClick={() => setMv('in')}><ArrowDownToLine size={18} /> {t('mv.in')}</button>
+      <button className="btn-out" onClick={() => setMv('out')}><ArrowUpFromLine size={18} /> {t('mv.out')}</button>
     </>
   );
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Boshqaruv paneli" actions={actions} />
+      <PageHeader title={t('dash.title')} actions={actions} />
       {error && <ErrorBox error={error} />}
       {isPending ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-28" />)}</div>
@@ -67,10 +72,10 @@ export default function Dashboard() {
         <>
           <motion.div variants={stagger.container} initial="hidden" animate="show" className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             {[
-              { icon: Wallet, label: 'Ombor qiymati', value: d.stock_value, fmt: (n: number) => `${moneyShort(n)} so‘m`, sub: `Sotuvda: ${moneyShort(d.potential_revenue)} so‘m`, cls: 'from-brand-500 to-indigo-600' },
-              { icon: Boxes, label: 'Mahsulot turlari', value: d.product_count, fmt: num, sub: `Jami ${num(d.total_quantity)} birlik`, cls: 'from-emerald-500 to-teal-600' },
-              { icon: AlertTriangle, label: 'Kam qolgan', value: d.low_stock_count, fmt: num, sub: 'Minimal qoldiqdan past', cls: 'from-amber-400 to-orange-500' },
-              { icon: PackageX, label: 'Tugagan', value: d.out_of_stock_count, fmt: num, sub: 'Qoldiq 0', cls: 'from-rose-500 to-pink-600' },
+              { icon: Wallet, label: t('dash.value'), value: d.stock_value, fmt: (n: number) => `${moneyShort(n)} ${t('common.currency')}`, sub: t('dash.valueSub', { v: `${moneyShort(d.potential_revenue)} ${t('common.currency')}` }), cls: 'from-brand-500 to-indigo-600' },
+              { icon: Boxes, label: t('dash.types'), value: d.product_count, fmt: num, sub: t('dash.typesSub', { n: num(d.total_quantity) }), cls: 'from-emerald-500 to-teal-600' },
+              { icon: AlertTriangle, label: t('dash.low'), value: d.low_stock_count, fmt: num, sub: t('dash.lowSub'), cls: 'from-amber-400 to-orange-500' },
+              { icon: PackageX, label: t('dash.out'), value: d.out_of_stock_count, fmt: num, sub: t('dash.outSub'), cls: 'from-rose-500 to-pink-600' },
             ].map((s) => (
               <motion.div key={s.label} variants={stagger.item} whileHover={{ y: -4 }} className="card relative overflow-hidden p-4 sm:p-5">
                 <div className={`absolute -right-6 -top-6 h-24 w-24 rounded-full bg-gradient-to-br ${s.cls} opacity-10`} />
@@ -82,22 +87,43 @@ export default function Dashboard() {
             ))}
           </motion.div>
 
+          {debts && (
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+              <Link to={`/omborlar/${wid}/qarzdorlar`}
+                className={`card group flex flex-wrap items-center gap-4 p-4 transition hover:shadow-lg sm:p-5 ${debts.overdue_count ? 'ring-rose-200' : ''}`}>
+                <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl text-white shadow-lg ${debts.overdue_count ? 'bg-gradient-to-br from-rose-500 to-pink-600' : 'bg-gradient-to-br from-amber-400 to-orange-500'}`}><HandCoins size={20} /></div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm text-slate-500">{t('dash.debts')}</div>
+                  <div className="flex flex-wrap items-baseline gap-x-3">
+                    <span className="text-xl font-extrabold">{money(debts.outstanding)}</span>
+                    <span className="text-sm text-slate-500">{debts.debtors_count ? t('dash.debtsSub', { n: debts.debtors_count }) : t('dash.noDebts')}</span>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {debts.overdue_count > 0 && <span className="badge bg-rose-50 px-3 py-1 text-rose-700 ring-1 ring-rose-200">{t('dash.overdueN', { n: debts.overdue_count })}</span>}
+                  {debts.due_today_count > 0 && <span className="badge bg-amber-50 px-3 py-1 text-amber-700 ring-1 ring-amber-200">{t('dash.todayN', { n: debts.due_today_count })}</span>}
+                </div>
+                <span className="flex items-center gap-1 text-sm font-semibold text-brand-600">{t('dash.toDebts')}<ChevronRight size={16} className="transition group-hover:translate-x-0.5" /></span>
+              </Link>
+            </motion.div>
+          )}
+
           <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="card p-6">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div><h2 className="font-bold">Kirim va chiqim</h2><p className="text-sm text-slate-500">So‘nggi 14 kun, summa bo‘yicha</p></div>
+                <div><h2 className="font-bold">{t('dash.flow')}</h2><p className="text-sm text-slate-500">{t('dash.flowSub')}</p></div>
                 <div className="flex gap-4 text-sm">
-                  <div><div className="flex items-center gap-1.5 text-slate-500"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> 30 kun kirim</div><div className="font-bold">{moneyShort(d.month_in_value)}</div></div>
-                  <div><div className="flex items-center gap-1.5 text-slate-500"><span className="h-2.5 w-2.5 rounded-full bg-rose-400" /> 30 kun chiqim</div><div className="font-bold">{moneyShort(d.month_out_value)}</div></div>
+                  <div><div className="flex items-center gap-1.5 text-slate-500"><span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> {t('dash.in30')}</div><div className="font-bold">{moneyShort(d.month_in_value)}</div></div>
+                  <div><div className="flex items-center gap-1.5 text-slate-500"><span className="h-2.5 w-2.5 rounded-full bg-rose-400" /> {t('dash.out30')}</div><div className="font-bold">{moneyShort(d.month_out_value)}</div></div>
                 </div>
               </div>
               <FlowChart daily={d.daily} />
             </motion.div>
 
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="card p-6">
-              <h2 className="flex items-center gap-2 font-bold"><AlertTriangle size={18} className="text-amber-500" /> To‘ldirish kerak</h2>
+              <h2 className="flex items-center gap-2 font-bold"><AlertTriangle size={18} className="text-amber-500" /> {t('dash.refill')}</h2>
               <div className="mt-3 divide-y divide-slate-100">
-                {!d.low_stock.length && <p className="py-6 text-center text-sm text-slate-500">Hamma mahsulot yetarli 👍</p>}
+                {!d.low_stock.length && <p className="py-6 text-center text-sm text-slate-500">{t('dash.allGood')}</p>}
                 {d.low_stock.map((p, i) => (
                   <motion.div key={p.id} initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25 + i * 0.04 }} className="py-2.5">
                     <div className="flex items-center justify-between gap-2 text-sm">
@@ -111,19 +137,19 @@ export default function Dashboard() {
                   </motion.div>
                 ))}
               </div>
-              {d.low_stock_count > 0 && <Link to={`/omborlar/${wid}/mahsulotlar?stock=low`} className="mt-3 block text-sm font-semibold text-brand-600 hover:underline">Barchasini ko‘rish →</Link>}
+              {d.low_stock_count > 0 && <Link to={`/omborlar/${wid}/mahsulotlar?stock=low`} className="mt-3 block text-sm font-semibold text-brand-600 hover:underline">{t('dash.seeAll')}</Link>}
             </motion.div>
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="card p-6">
-              <div className="flex items-center justify-between"><h2 className="font-bold">So‘nggi harakatlar</h2><Link to={`/omborlar/${wid}/harakatlar`} className="text-sm font-semibold text-brand-600 hover:underline">Hammasi →</Link></div>
+              <div className="flex items-center justify-between"><h2 className="font-bold">{t('dash.recent')}</h2><Link to={`/omborlar/${wid}/harakatlar`} className="text-sm font-semibold text-brand-600 hover:underline">{t('dash.all')}</Link></div>
               <div className="mt-3 divide-y divide-slate-100">
-                {!d.recent.length && <p className="py-6 text-center text-sm text-slate-500">Hali kirim-chiqim yo‘q</p>}
+                {!d.recent.length && <p className="py-6 text-center text-sm text-slate-500">{t('dash.noMoves')}</p>}
                 {d.recent.map((m) => (
                   <div key={m.id} className="flex items-center gap-3 py-3">
                     <MovementIcon type={m.type} />
-                    <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{m.product_name}</div><div className="truncate text-xs text-slate-400">{MOVEMENT[m.type].label}{m.counterparty && ` · ${m.counterparty}`} · {timeAgo(m.created_at)}</div></div>
+                    <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium">{m.product_name}</div><div className="truncate text-xs text-slate-400">{t(`mv.${m.type}`)}{m.debt_id && ` · ${t('mvp.credit')}`}{m.counterparty && ` · ${m.counterparty}`} · {timeAgo(m.created_at)}</div></div>
                     <div className="text-right"><div className={`text-sm font-bold tabular-nums ${m.delta > 0 ? 'text-emerald-600' : m.delta < 0 ? 'text-rose-600' : 'text-slate-500'}`}>{m.delta > 0 ? '+' : ''}{num(m.delta)} {m.unit}</div><div className="text-xs text-slate-400">{money(m.quantity * m.price)}</div></div>
                   </div>
                 ))}
@@ -131,7 +157,7 @@ export default function Dashboard() {
             </motion.div>
 
             <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="card p-6">
-              <div className="flex items-center gap-2"><TrendingUp size={18} className="text-brand-600" /><h2 className="font-bold">Kategoriyalar ulushi</h2></div>
+              <div className="flex items-center gap-2"><TrendingUp size={18} className="text-brand-600" /><h2 className="font-bold">{t('dash.cats')}</h2></div>
               {d.categories.length > 0 && (
                 <div className="mt-5 flex h-3 overflow-hidden rounded-full bg-slate-100">
                   {d.categories.map((c, i) => (
@@ -140,11 +166,11 @@ export default function Dashboard() {
                 </div>
               )}
               <div className="mt-4 space-y-2.5">
-                {!d.categories.length && <p className="py-6 text-center text-sm text-slate-500">Mahsulot yo‘q</p>}
+                {!d.categories.length && <p className="py-6 text-center text-sm text-slate-500">{t('dash.noProducts')}</p>}
                 {d.categories.map((c) => (
                   <div key={c.name} className="flex items-center gap-3 text-sm">
                     <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${COLORS[c.color].dot}`} />
-                    <span className="flex-1 truncate">{c.name} <span className="text-slate-400">({c.product_count})</span></span>
+                    <span className="flex-1 truncate">{c.name === 'Kategoriyasiz' ? t('cat.none') : c.name} <span className="text-slate-400">({c.product_count})</span></span>
                     <span className="font-semibold tabular-nums">{moneyShort(c.stock_value)}</span>
                     <span className="w-10 text-right text-xs text-slate-400">{Math.round((c.stock_value / Math.max(1, d.stock_value)) * 100)}%</span>
                   </div>

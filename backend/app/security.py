@@ -2,11 +2,12 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 import jwt
-from fastapi import Depends, HTTPException, Path, status
+from fastapi import Depends, Path, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from .config import settings
+from .i18n import http_error
 from .database import get_db
 from .models import User, Warehouse
 
@@ -30,14 +31,14 @@ def get_current_user(
     creds: HTTPAuthorizationCredentials | None = Depends(bearer), db: Session = Depends(get_db)
 ) -> User:
     if creds is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Tizimga kiring", headers={"WWW-Authenticate": "Bearer"})
+        raise http_error(status.HTTP_401_UNAUTHORIZED, "login_required")
     try:
         payload = jwt.decode(creds.credentials, settings.jwt_secret, algorithms=["HS256"])
         user = db.get(User, int(payload["sub"]))
     except (jwt.PyJWTError, KeyError, ValueError):
         user = None
     if user is None:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Sessiya tugagan, qayta kiring")
+        raise http_error(status.HTTP_401_UNAUTHORIZED, "session_expired")
     return user
 
 
@@ -49,5 +50,5 @@ def get_warehouse(
     """Faqat egasi o'z omboriga kira oladi — boshqa birovniki 404 qaytaradi."""
     wh = db.get(Warehouse, warehouse_id)
     if wh is None or wh.owner_id != user.id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Ombor topilmadi")
+        raise http_error(status.HTTP_404_NOT_FOUND, "warehouse_not_found")
     return wh

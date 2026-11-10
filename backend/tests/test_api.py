@@ -72,3 +72,81 @@ def test_product_crud_and_movements(client, user, wh):
 
 def test_health(client):
     assert client.get("/api/health").json() == {"status": "ok", "database": "ok"}
+
+
+def test_debts_flow(client, user, wh):
+    from datetime import timedelta
+
+    from app.timeutil import today as tashkent_today
+    base = f"/api/warehouses/{wh}"
+    today = tashkent_today()
+    # Yangi mijoz bilan qarz yozish
+    r = client.post(f"{base}/debts", headers=user, json={
+        "customer_name": "Baraka do‘koni", "customer_phone": "+998 90 111 22 33",
+        "description": "Guruch 10 qop", "amount": 5_000_000, "due_date": str(today + timedelta(days=7))})
+    assert r.status_code == 201, r.text
+    d = r.json()
+    assert d["status"] == "open" and d["remaining"] == 5_000_000 and d["customer"]["phone"] == "+998901112233"
+    # Xuddi shu telefon — o'sha mijoz qayta ishlatiladi
+    r2 = client.post(f"{base}/debts", headers=user, json={
+        "customer_name": "Baraka", "customer_phone": "+998901112233", "description": "Shakar", "amount": 1_000_000,
+        "given_date": str(today - timedelta(days=10)), "due_date": str(today - timedelta(days=2))})
+    assert r2.json()["customer"]["id"] == d["customer"]["id"] and r2.json()["status"] == "overdue"
+    assert len(client.get(f"{base}/customers", headers=user).json()) == 1
+
+    # To'lovlar: qisman, ortiqcha (409), to'liq
+    pay = lambda did, a: client.post(f"{base}/debts/{did}/payments", headers=user, json={"amount": a})  # noqa: E731
+    assert pay(d["id"], 2_000_000).json()["remaining"] == 3_000_000
+    assert pay(d["id"], 3_500_000).status_code == 409
+    full = pay(d["id"], 3_000_000).json()
+    assert full["status"] == "paid" and len(full["payments"]) == 2
+    assert pay(d["id"], 1).status_code == 409
+    # To'lovni bekor qilish
+    undone = client.delete(f"{base}/debts/{d['id']}/payments/{full['payments'][0]['id']}", headers=user).json()
+    assert undone["remaining"] == 3_000_000 and undone["status"] == "open"
+
+    # Filtrlar, xulosa, bildirishnomalar
+    assert [x["id"] for x in client.get(f"{base}/debts?filter=overdue", headers=user).json()] == [r2.json()["id"]]
+    s = client.get(f"{base}/debts/summary", headers=user).json()
+    assert s["outstanding"] == 4_000_000 and s["overdue_count"] == 1 and s["debtors_count"] == 1
+    n = client.get("/api/notifications", headers=user).json()
+    assert len(n) == 1 and n[0]["kind"] == "overdue" and n[0]["days_left"] == -2
+
+    # Validatsiya
+    bad = client.post(f"{base}/debts", headers=user, json={"description": "x", "amount": 10})
+    assert bad.status_code == 422
+    assert client.put(f"{base}/debts/{d['id']}", headers=user, json={
+        "description": "x", "amount": 1_000_000, "given_date": str(today)}).status_code == 400  # to'langandan kam
+    assert client.post(f"{base}/debts/{d['id']}/remind", headers=user).json()["reminded_at"]
+
+
+def test_out_movement_on_credit(client, user, wh):
+    base = f"/api/warehouses/{wh}"
+    p = client.post(f"{base}/products", headers=user, json={"name": "Shakar 50 kg", "sku": "S-1", "unit": "qop",
+                                                             "cost_price": 560000, "sale_price": 610000, "initial_quantity": 20}).json()
+    r = client.post(f"{base}/movements", headers=user, json={
+        "product_id": p["id"], "type": "out", "quantity": 5, "debt": {"customer_name": "Oila market"}})
+    assert r.status_code == 201 and r.json()["debt_id"] and r.json()["counterparty"] == "Oila market"
+    debts = client.get(f"{base}/debts", headers=user).json()
+    assert debts[0]["amount"] == 5 * 610000 and debts[0]["movement_id"] == r.json()["id"]
+    # Kirimni qarzga yozib bo'lmaydi
+    assert client.post(f"{base}/movements", headers=user, json={
+        "product_id": p["id"], "type": "in", "quantity": 1, "debt": {"customer_name": "X"}}).status_code == 400
+    # Qoldiq yetmasa — qarz ham yozilmaydi
+    assert client.post(f"{base}/movements", headers=user, json={
+        "product_id": p["id"], "type": "out", "quantity": 99, "debt": {"customer_name": "Y"}}).status_code == 409
+    assert len(client.get(f"{base}/debts", headers=user).json()) == 1
+
+
+def test_russian_messages(client, user):
+    r = client.post("/api/auth/login", json={"phone": "+998911112233", "password": "xato!!"}, headers={"Accept-Language": "ru"})
+    assert r.json()["detail"] == "Неверный телефон или пароль"
+    r = client.post("/api/auth/login", json={"phone": "+998911112233", "password": "xato!!"})
+    assert r.json()["detail"] == "Telefon yoki parol noto‘g‘ri"
+
+
+def test_demo_has_debts(client):
+    h = {"Authorization": f"Bearer {client.post('/api/auth/login', json={'phone': '+998900000000', 'password': 'demo123'}).json()['access_token']}"}
+    wid = client.get("/api/warehouses", headers=h).json()[0]["id"]
+    s = client.get(f"/api/warehouses/{wid}/debts/summary", headers=h).json()
+    assert s["overdue_count"] == 1 and s["due_today_count"] == 1 and s["debtors_count"] == 4

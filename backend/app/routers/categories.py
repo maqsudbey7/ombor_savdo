@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ..i18n import http_error
 from ..database import get_db
 from ..models import Category, Product, Warehouse
 from ..schemas import CategoryIn, CategoryOut
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/warehouses/{warehouse_id}/categories", tags=["Katego
 def get_category(category_id: int, wh: Warehouse = Depends(get_warehouse), db: Session = Depends(get_db)) -> Category:
     c = db.get(Category, category_id)
     if c is None or c.warehouse_id != wh.id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Kategoriya topilmadi")
+        raise http_error(status.HTTP_404_NOT_FOUND, "category_not_found")
     return c
 
 
@@ -24,7 +25,7 @@ def save(db: Session, c: Category) -> CategoryOut:
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status.HTTP_409_CONFLICT, "Bunday nomli kategoriya bor")
+        raise http_error(status.HTTP_409_CONFLICT, "category_exists")
     count = db.scalar(select(func.count(Product.id)).where(Product.category_id == c.id))
     return CategoryOut(id=c.id, name=c.name, color=c.color, product_count=count)
 

@@ -5,12 +5,17 @@ import { save } from '../lib/storage';
 
 export const store = configureStore({ reducer: { auth, ui } });
 
-// Kirish ma'lumotini localStorage'da saqlash
-let prev = store.getState().auth;
+// Kirish ma'lumoti va tilni localStorage'da saqlash
+let prev = store.getState();
+document.documentElement.lang = prev.ui.lang;
 store.subscribe(() => {
-  const { auth: a } = store.getState();
-  if (a !== prev) save('auth', a);
-  prev = a;
+  const s = store.getState();
+  if (s.auth !== prev.auth) save('auth', s.auth);
+  if (s.ui.lang !== prev.ui.lang) {
+    try { localStorage.setItem('lang', s.ui.lang); } catch { /* storage yo'q */ }
+    document.documentElement.lang = s.ui.lang;
+  }
+  prev = s;
 });
 
 export type RootState = ReturnType<typeof store.getState>;

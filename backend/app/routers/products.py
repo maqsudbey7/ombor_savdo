@@ -2,11 +2,12 @@ import csv
 import io
 from enum import Enum
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from ..i18n import http_error, tr
 from ..database import get_db
 from ..models import Category, Movement, MovementType, Product, User, Warehouse
 from ..schemas import ProductCreate, ProductOut, ProductUpdate
@@ -32,7 +33,7 @@ class SortBy(str, Enum):
 def get_product(product_id: int, wh: Warehouse = Depends(get_warehouse), db: Session = Depends(get_db)) -> Product:
     p = db.get(Product, product_id)
     if p is None or p.warehouse_id != wh.id:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Mahsulot topilmadi")
+        raise http_error(status.HTTP_404_NOT_FOUND, "product_not_found")
     return p
 
 
@@ -40,7 +41,7 @@ def check_category(db: Session, wh: Warehouse, category_id: int | None) -> None:
     if category_id is not None:
         c = db.get(Category, category_id)
         if c is None or c.warehouse_id != wh.id:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Kategoriya bu omborga tegishli emas")
+            raise http_error(status.HTTP_400_BAD_REQUEST, "category_wrong_wh")
 
 
 def commit_or_409(db: Session) -> None:
@@ -48,7 +49,7 @@ def commit_or_409(db: Session) -> None:
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status.HTTP_409_CONFLICT, "Bu SKU (artikul) shu omborda band")
+        raise http_error(status.HTTP_409_CONFLICT, "sku_taken")
 
 
 def query(wh: Warehouse, q: str | None, category_id: int | None, stock: StockFilter, sort: SortBy):
@@ -106,7 +107,7 @@ def create_product(data: ProductCreate, wh: Warehouse = Depends(get_warehouse),
     if data.initial_quantity:
         db.add(Movement(warehouse_id=wh.id, product=p, user_id=user.id, type=MovementType.incoming,
                         product_name=p.name, unit=p.unit, quantity=data.initial_quantity, delta=data.initial_quantity,
-                        balance_after=data.initial_quantity, price=p.cost_price, note="Boshlang‘ich qoldiq"))
+                        balance_after=data.initial_quantity, price=p.cost_price, note=tr("initial_stock")))
     commit_or_409(db)
     db.refresh(p)
     return p

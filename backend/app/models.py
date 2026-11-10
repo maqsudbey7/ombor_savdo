@@ -3,12 +3,13 @@
 Bog'lanishlar (One-to-Many):
     User 1 ── N Warehouse 1 ── N Category
                          1 ── N Product 1 ── N Movement
+                         1 ── N Customer 1 ── N Debt 1 ── N DebtPayment
 Jadval nomlari `ombor_` prefiksi bilan — bir bazada boshqa loyiha jadvallari bilan to'qnashmaydi.
 """
 import enum
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import (BigInteger, CheckConstraint, DateTime, Enum, ForeignKey, Integer, String, Text,
+from sqlalchemy import (BigInteger, CheckConstraint, Date, DateTime, Enum, ForeignKey, Integer, String, Text,
                         UniqueConstraint, func)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -48,6 +49,7 @@ class Warehouse(Base):
     categories: Mapped[list["Category"]] = relationship(back_populates="warehouse", cascade="all, delete-orphan")
     products: Mapped[list["Product"]] = relationship(back_populates="warehouse", cascade="all, delete-orphan")
     movements: Mapped[list["Movement"]] = relationship(back_populates="warehouse", cascade="all, delete-orphan")
+    customers: Mapped[list["Customer"]] = relationship(back_populates="warehouse", cascade="all, delete-orphan")
 
 
 class Category(Base):
@@ -114,3 +116,73 @@ class Movement(Base):
 
     warehouse: Mapped[Warehouse] = relationship(back_populates="movements")
     product: Mapped[Product | None] = relationship(back_populates="movements")
+    debt: Mapped["Debt | None"] = relationship(back_populates="movement", uselist=False, lazy="selectin")
+
+    @property
+    def debt_id(self) -> int | None:
+        return self.debt.id if self.debt else None
+
+
+class Customer(Base):
+    """Qarzdor mijoz (do'kon, usta, tashkilot...)."""
+
+    __tablename__ = "ombor_customers"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    warehouse_id: Mapped[int] = mapped_column(ForeignKey("ombor_warehouses.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    phone: Mapped[str] = mapped_column(String(20), default="")
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    warehouse: Mapped[Warehouse] = relationship(back_populates="customers")
+    debts: Mapped[list["Debt"]] = relationship(back_populates="customer", cascade="all, delete-orphan",
+                                               order_by="Debt.given_date.desc()", lazy="selectin")
+
+
+class Debt(Base):
+    """Qarzga berilgan tovar yoki pul: kimga, nima, qancha, qachongacha."""
+
+    __tablename__ = "ombor_debts"
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_debt_amount_pos"),
+        CheckConstraint("paid_amount >= 0 AND paid_amount <= amount", name="ck_debt_paid_range"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    warehouse_id: Mapped[int] = mapped_column(ForeignKey("ombor_warehouses.id", ondelete="CASCADE"), index=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("ombor_customers.id", ondelete="CASCADE"), index=True)
+    movement_id: Mapped[int | None] = mapped_column(ForeignKey("ombor_movements.id", ondelete="SET NULL"), unique=True)
+    description: Mapped[str] = mapped_column(String(300))
+    amount: Mapped[int] = mapped_column(BigInteger)
+    paid_amount: Mapped[int] = mapped_column(BigInteger, default=0)
+    given_date: Mapped[date] = mapped_column(Date)
+    due_date: Mapped[date | None] = mapped_column(Date, index=True)
+    note: Mapped[str] = mapped_column(Text, default="")
+    reminded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    customer: Mapped[Customer] = relationship(back_populates="debts", lazy="joined")
+    movement: Mapped[Movement | None] = relationship(back_populates="debt")
+    payments: Mapped[list["DebtPayment"]] = relationship(back_populates="debt", cascade="all, delete-orphan",
+                                                          order_by="DebtPayment.paid_at.desc()", lazy="selectin")
+
+    @property
+    def remaining(self) -> int:
+        return self.amount - self.paid_amount
+
+
+class DebtPayment(Base):
+    """Qarzni qaytarish (qisman yoki to'liq)."""
+
+    __tablename__ = "ombor_debt_payments"
+    __table_args__ = (CheckConstraint("amount > 0", name="ck_payment_amount_pos"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    debt_id: Mapped[int] = mapped_column(ForeignKey("ombor_debts.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("ombor_users.id", ondelete="SET NULL"))
+    amount: Mapped[int] = mapped_column(BigInteger)
+    note: Mapped[str] = mapped_column(String(300), default="")
+    paid_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    debt: Mapped[Debt] = relationship(back_populates="payments")

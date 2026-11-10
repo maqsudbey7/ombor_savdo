@@ -79,6 +79,7 @@ export interface Movement {
   counterparty: string;
   note: string;
   created_at: string;
+  debt_id: number | null;
 }
 export interface MovementPayload {
   product_id: number;
@@ -87,6 +88,8 @@ export interface MovementPayload {
   price?: number;
   counterparty: string;
   note: string;
+  /** Faqat chiqimda: qarzga berildi */
+  debt?: CustomerRef & { due_date: string | null };
 }
 export interface MovementFilters { type?: MovementType; product_id?: number; limit?: number }
 
@@ -103,4 +106,72 @@ export interface Dashboard {
   low_stock: { id: number; name: string; sku: string; unit: string; quantity: number; min_quantity: number }[];
   categories: { name: string; color: Color; product_count: number; stock_value: number }[];
   recent: Movement[];
+}
+
+// ---------- Qarzdorlik ----------
+export type DebtStatus = 'paid' | 'overdue' | 'due_today' | 'due_soon' | 'open';
+export type DebtFilter = 'open' | 'overdue' | 'soon' | 'paid' | 'all';
+
+/** Mavjud mijoz (customer_id) yoki yangi mijoz (ism + telefon). */
+export interface CustomerRef { customer_id?: number; customer_name?: string; customer_phone?: string }
+
+export interface CustomerBrief { id: number; name: string; phone: string }
+export interface Customer extends CustomerBrief {
+  note: string;
+  created_at: string;
+  total: number;
+  paid: number;
+  remaining: number;
+  open_count: number;
+  overdue_count: number;
+  next_due: string | null;
+}
+export interface CustomerPayload { name: string; phone: string; note: string }
+
+export interface DebtPayment { id: number; amount: number; note: string; paid_at: string }
+export interface Debt {
+  id: number;
+  customer: CustomerBrief;
+  description: string;
+  amount: number;
+  paid_amount: number;
+  remaining: number;
+  given_date: string;
+  due_date: string | null;
+  status: DebtStatus;
+  days_left: number | null;
+  note: string;
+  reminded_at: string | null;
+  movement_id: number | null;
+  created_at: string;
+  payments: DebtPayment[];
+}
+export interface DebtPayload extends CustomerRef {
+  description: string;
+  amount: number;
+  given_date: string;
+  due_date: string | null;
+  note: string;
+}
+export interface DebtSummary {
+  outstanding: number;
+  overdue_amount: number;
+  overdue_count: number;
+  due_today_count: number;
+  due_soon_count: number;
+  debtors_count: number;
+  collected_30d: number;
+}
+export interface Notification {
+  kind: 'overdue' | 'due_today' | 'due_soon';
+  warehouse_id: number;
+  warehouse_name: string;
+  debt_id: number;
+  customer_id: number;
+  customer_name: string;
+  customer_phone: string;
+  description: string;
+  remaining: number;
+  due_date: string;
+  days_left: number;
 }

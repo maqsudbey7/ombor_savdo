@@ -12,7 +12,8 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 from .config import settings
 from .database import engine, try_init_db
-from .routers import auth, categories, movements, products, warehouses
+from .i18n import lang_var, pick_lang, tr
+from .routers import auth, categories, debts, movements, products, warehouses
 
 log = logging.getLogger("ombor")
 
@@ -44,10 +45,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DB_HELP = (
-    "Ma’lumotlar bazasiga ulanib bo‘lmadi. Vercel’da Storage → Neon bazasini loyihaga ulang"
-    " (DATABASE_URL), so‘ng Redeploy qiling."
-)
+
+
+class LanguageMiddleware:
+    """`Accept-Language: ru` bo'lsa xabarlar ruscha, aks holda o'zbekcha (sof ASGI — contextvar endpoint'gacha yetadi)."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http":
+            header = dict(scope.get("headers") or []).get(b"accept-language", b"").decode("latin-1")
+            token = lang_var.set(pick_lang(header))
+            try:
+                await self.app(scope, receive, send)
+            finally:
+                lang_var.reset(token)
+        else:
+            await self.app(scope, receive, send)
+
+
+app.add_middleware(LanguageMiddleware)
 
 
 @app.exception_handler(RequestValidationError)
@@ -55,7 +73,7 @@ async def validation_handler(_: Request, exc: RequestValidationError):
     errors = exc.errors()
     first = errors[0] if errors else {}
     field = ".".join(str(x) for x in first.get("loc", [])[1:])
-    msg = str(first.get("msg", "Ma’lumot noto‘g‘ri")).removeprefix("Value error, ")
+    msg = str(first.get("msg") or tr("invalid_data")).removeprefix("Value error, ")
     return JSONResponse(
         status_code=422,
         content={
@@ -68,16 +86,17 @@ async def validation_handler(_: Request, exc: RequestValidationError):
 @app.exception_handler(OperationalError)
 async def db_unavailable(_: Request, exc: OperationalError):
     log.error("Baza xatosi: %s", exc.orig)
-    return JSONResponse(status_code=503, content={"detail": DB_HELP})
+    return JSONResponse(status_code=503, content={"detail": tr("db_unavailable")})
 
 
 @app.exception_handler(SQLAlchemyError)
 async def db_error(_: Request, exc: SQLAlchemyError):
     log.exception("SQL xatosi", exc_info=exc)
-    return JSONResponse(status_code=500, content={"detail": "Bazada xatolik yuz berdi"})
+    return JSONResponse(status_code=500, content={"detail": tr("db_error")})
 
 
-for r in (auth.router, warehouses.router, categories.router, products.router, movements.router):
+for r in (auth.router, warehouses.router, categories.router, products.router, movements.router,
+          debts.customers_router, debts.debts_router, debts.notifications_router):
     app.include_router(r, prefix="/api")
 
 
@@ -85,12 +104,12 @@ for r in (auth.router, warehouses.router, categories.router, products.router, mo
 def health():
     """Server va baza holati (Vercel’da sozlamani tekshirish uchun)."""
     if not settings.database_configured:
-        return JSONResponse(status_code=503, content={"status": "error", "database": "not_configured", "detail": DB_HELP})
+        return JSONResponse(status_code=503, content={"status": "error", "database": "not_configured", "detail": tr("db_unavailable")})
     try:
         with engine.connect() as conn:
             conn.execute(text("select 1"))
     except Exception as e:  # noqa: BLE001
-        return JSONResponse(status_code=503, content={"status": "error", "database": type(e).__name__, "detail": DB_HELP})
+        return JSONResponse(status_code=503, content={"status": "error", "database": type(e).__name__, "detail": tr("db_unavailable")})
     return {"status": "ok", "database": "ok"}
 
 
@@ -102,6 +121,6 @@ if (dist / "index.html").exists():
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str):
         if path.startswith("api/"):
-            return JSONResponse({"detail": "Topilmadi"}, status_code=404)
+            return JSONResponse({"detail": tr("not_found")}, status_code=404)
         file = dist / path
         return FileResponse(file if path and file.is_file() else dist / "index.html")

@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..i18n import http_error
 from ..database import get_db
 from ..models import User
 from ..schemas import LoginIn, RegisterIn, TokenOut, UserOut
@@ -13,7 +14,7 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 @router.post("/register", response_model=TokenOut, status_code=status.HTTP_201_CREATED)
 def register(data: RegisterIn, db: Session = Depends(get_db)):
     if db.scalar(select(User).where(User.phone == data.phone)):
-        raise HTTPException(status.HTTP_409_CONFLICT, "Bu telefon raqam ro‘yxatdan o‘tgan")
+        raise http_error(status.HTTP_409_CONFLICT, "phone_taken")
     user = User(name=data.name.strip(), phone=data.phone, password_hash=hash_password(data.password))
     db.add(user)
     db.commit()
@@ -24,7 +25,7 @@ def register(data: RegisterIn, db: Session = Depends(get_db)):
 def login(data: LoginIn, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.phone == data.phone))
     if not user or not verify_password(data.password, user.password_hash):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Telefon yoki parol noto‘g‘ri")
+        raise http_error(status.HTTP_401_UNAUTHORIZED, "bad_credentials")
     return TokenOut(access_token=create_token(user), user=UserOut.model_validate(user))
 
 

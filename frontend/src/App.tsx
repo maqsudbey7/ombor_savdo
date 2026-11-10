@@ -12,14 +12,17 @@ import Products from './pages/warehouse/Products';
 import Movements from './pages/warehouse/Movements';
 import Categories from './pages/warehouse/Categories';
 import Settings from './pages/warehouse/Settings';
+import Debts from './pages/warehouse/Debts';
+import { useT } from './i18n';
 
 function NotFound() {
+  const t = useT();
   return (
     <div className="grid min-h-screen place-items-center px-4 text-center">
       <div>
         <div className="bg-gradient-to-br from-brand-400 to-violet-500 bg-clip-text text-8xl font-black text-transparent">404</div>
-        <p className="mt-2 text-slate-500">Sahifa topilmadi</p>
-        <Link to="/" className="btn-primary mt-6">Bosh sahifa</Link>
+        <p className="mt-2 text-slate-500">{t('common.notFound')}</p>
+        <Link to="/" className="btn-primary mt-6">{t('common.home')}</Link>
       </div>
     </div>
   );
@@ -43,6 +46,7 @@ export default function App() {
         <Route path=":wid" element={<Dashboard />} />
         <Route path=":wid/mahsulotlar" element={<Products />} />
         <Route path=":wid/harakatlar" element={<Movements />} />
+        <Route path=":wid/qarzdorlar" element={<Debts />} />
         <Route path=":wid/kategoriyalar" element={<Categories />} />
         <Route path=":wid/sozlamalar" element={<Settings />} />
       </Route>

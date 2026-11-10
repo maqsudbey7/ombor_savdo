@@ -7,8 +7,9 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .config import settings
-from .models import Category, Movement, MovementType, Product, User, Warehouse
+from .models import Category, Customer, Debt, DebtPayment, Movement, MovementType, Product, User, Warehouse
 from .security import hash_password
+from .timeutil import TASHKENT, today
 
 SAMPLE_CATEGORIES = [
     ("Oziq-ovqat", "amber"), ("Ichimliklar", "cyan"), ("Maishiy kimyo", "violet"),
@@ -97,4 +98,51 @@ def seed_demo(db: Session) -> None:
         fill_warehouse(db, branch, user, products=[p for p in SAMPLE_PRODUCTS if p[2] == "Qurilish mollari"], history_days=10)
         db.commit()
     except IntegrityError:  # bir vaqtda ikkita serverless nusxa seed qilsa
+        db.rollback()
+
+
+# name, phone, [(description, amount, given_days_ago, due_in_days, [(paid, days_ago)])]
+DEMO_DEBTS = [
+    ("Baraka do‘koni (Akmal aka)", "+998901112233", [
+        ('Guruch "Lazer" 25 kg — 10 qop', 5_200_000, 20, -5, [(2_000_000, 12)]),
+    ]),
+    ("Oila market", "+998935554433", [
+        ("Shakar 50 kg — 5 qop", 3_050_000, 10, 0, []),
+    ]),
+    ("Yunusobod minimarket", "+998977776655", [
+        ("Mineral suv 1.5 L — 40 blok", 1_080_000, 3, 2, []),
+        ("Gazli ichimlik 1 L — 6 blok", 612_000, 1, 9, []),
+    ]),
+    ("Qurilish ustasi Bobur", "+998991234567", [
+        ("Sement M400 50 kg — 100 qop", 6_200_000, 15, 10, [(3_000_000, 6)]),
+    ]),
+    ("Chilonzor savdo", "+998946667788", [
+        ("Kir yuvish kukuni 3 kg — 6 quti", 1_560_000, 30, -16, [(800_000, 22), (760_000, 17)]),
+    ]),
+]
+
+
+def seed_demo_debts(db: Session) -> None:
+    """Demo hisobning birinchi omboriga namunaviy qarzdorlar (faqat hali qarzdor bo'lmasa)."""
+    user = db.scalar(select(User).where(User.phone == settings.demo_phone))
+    if user is None:
+        return
+    wh = db.scalar(select(Warehouse).where(Warehouse.owner_id == user.id).order_by(Warehouse.id).limit(1))
+    if wh is None or db.scalar(select(Customer.id).where(Customer.warehouse_id == wh.id).limit(1)):
+        return
+    t = today()
+    try:
+        for name, phone, debts in DEMO_DEBTS:
+            c = Customer(warehouse_id=wh.id, name=name, phone=phone)
+            db.add(c)
+            for desc, amount, given_ago, due_in, payments in debts:
+                d = Debt(warehouse_id=wh.id, customer=c, description=desc, amount=amount,
+                         given_date=t - timedelta(days=given_ago), due_date=t + timedelta(days=due_in),
+                         paid_amount=sum(p for p, _ in payments))
+                for paid, ago in payments:
+                    at = datetime.combine(t - timedelta(days=ago), datetime.min.time(), tzinfo=TASHKENT) + timedelta(hours=11)
+                    d.payments.append(DebtPayment(amount=paid, user_id=user.id, paid_at=at))
+                db.add(d)
+        db.commit()
+    except IntegrityError:
         db.rollback()

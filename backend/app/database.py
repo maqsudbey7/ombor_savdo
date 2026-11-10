@@ -46,11 +46,12 @@ def ensure_db() -> None:
     if _ready:
         return
     from . import models  # noqa: F401
-    from .seed import seed_demo
+    from .seed import seed_demo, seed_demo_debts
 
-    Base.metadata.create_all(engine)
+    Base.metadata.create_all(engine)  # yangi jadvallar (masalan qarzdorlik) mavjud bazaga ham qo'shiladi
     with SessionLocal() as db:
         seed_demo(db)
+        seed_demo_debts(db)
     _ready = True
 
 

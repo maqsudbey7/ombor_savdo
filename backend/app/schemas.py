@@ -2,9 +2,11 @@ import re
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .i18n import tr
 from .models import MovementType
+from .timeutil import today
 
 COLORS = ("blue", "emerald", "amber", "rose", "violet", "cyan", "orange", "slate")
 Color = Literal["blue", "emerald", "amber", "rose", "violet", "cyan", "orange", "slate"]
@@ -13,8 +15,12 @@ Color = Literal["blue", "emerald", "amber", "rose", "violet", "cyan", "orange", 
 def normalize_phone(v: str) -> str:
     v = re.sub(r"[^\d+]", "", v or "")
     if not re.fullmatch(r"\+?\d{9,15}", v):
-        raise ValueError("Telefon raqam noto‘g‘ri")
+        raise ValueError(tr("bad_phone"))
     return v
+
+
+def optional_phone(v: str | None) -> str:
+    return normalize_phone(v) if v and re.sub(r"[^\d]", "", v) not in ("", "998") else ""
 
 
 class ORM(BaseModel):
@@ -136,6 +142,24 @@ class ProductOut(ORM):
 
 
 # ---------- Movements ----------
+class DebtForMovement(BaseModel):
+    """Chiqim qarzga berilganda: kimga va qachongacha."""
+    customer_id: int | None = None
+    customer_name: str | None = Field(default=None, max_length=120)
+    customer_phone: str | None = None
+    due_date: date | None = None
+
+    _phone = field_validator("customer_phone")(optional_phone)
+
+    @model_validator(mode="after")
+    def check(self):
+        if not self.customer_id and not (self.customer_name or "").strip():
+            raise ValueError(tr("customer_required"))
+        if self.due_date and self.due_date < today():
+            raise ValueError(tr("due_before_given"))
+        return self
+
+
 class MovementIn(BaseModel):
     product_id: int
     type: MovementType
@@ -143,6 +167,7 @@ class MovementIn(BaseModel):
     price: int | None = Field(default=None, ge=0, description="Bo‘sh bo‘lsa mahsulot narxi olinadi")
     counterparty: str = Field(default="", max_length=160)
     note: str = Field(default="", max_length=500)
+    debt: DebtForMovement | None = Field(default=None, description="Faqat chiqimda: qarzga berildi")
 
 
 class MovementOut(ORM):
@@ -158,6 +183,125 @@ class MovementOut(ORM):
     counterparty: str
     note: str
     created_at: datetime
+    debt_id: int | None = None
+
+
+# ---------- Qarzdorlik ----------
+DebtStatus = Literal["paid", "overdue", "due_today", "due_soon", "open"]
+
+
+class CustomerIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    phone: str = ""
+    note: str = Field(default="", max_length=1000)
+
+    _phone = field_validator("phone")(optional_phone)
+
+
+class CustomerBrief(ORM):
+    id: int
+    name: str
+    phone: str
+
+
+class CustomerOut(CustomerBrief):
+    note: str
+    created_at: datetime
+    total: int = 0          # jami berilgan qarz
+    paid: int = 0           # qaytarilgan
+    remaining: int = 0      # qolgan qarz
+    open_count: int = 0
+    overdue_count: int = 0
+    next_due: date | None = None
+
+
+class DebtCreate(BaseModel):
+    customer_id: int | None = None
+    customer_name: str | None = Field(default=None, max_length=120)
+    customer_phone: str | None = None
+    description: str = Field(min_length=1, max_length=300)
+    amount: int = Field(gt=0)
+    given_date: date = Field(default_factory=today)
+    due_date: date | None = None
+    note: str = Field(default="", max_length=1000)
+
+    _phone = field_validator("customer_phone")(optional_phone)
+
+    @model_validator(mode="after")
+    def check(self):
+        if not self.customer_id and not (self.customer_name or "").strip():
+            raise ValueError(tr("customer_required"))
+        if self.due_date and self.due_date < self.given_date:
+            raise ValueError(tr("due_before_given"))
+        return self
+
+
+class DebtUpdate(BaseModel):
+    description: str = Field(min_length=1, max_length=300)
+    amount: int = Field(gt=0)
+    given_date: date
+    due_date: date | None = None
+    note: str = Field(default="", max_length=1000)
+
+    @model_validator(mode="after")
+    def check(self):
+        if self.due_date and self.due_date < self.given_date:
+            raise ValueError(tr("due_before_given"))
+        return self
+
+
+class PaymentIn(BaseModel):
+    amount: int = Field(gt=0)
+    note: str = Field(default="", max_length=300)
+
+
+class PaymentOut(ORM):
+    id: int
+    amount: int
+    note: str
+    paid_at: datetime
+
+
+class DebtOut(ORM):
+    id: int
+    customer: CustomerBrief
+    description: str
+    amount: int
+    paid_amount: int
+    remaining: int
+    given_date: date
+    due_date: date | None
+    status: DebtStatus
+    days_left: int | None      # muddatgacha qolgan kun (manfiy — o'tib ketgan)
+    note: str
+    reminded_at: datetime | None
+    movement_id: int | None
+    created_at: datetime
+    payments: list[PaymentOut]
+
+
+class DebtSummary(BaseModel):
+    outstanding: int            # jami qolgan qarz
+    overdue_amount: int
+    overdue_count: int
+    due_today_count: int
+    due_soon_count: int         # 3 kun ichida
+    debtors_count: int          # qarzi bor mijozlar
+    collected_30d: int          # so'nggi 30 kunda qaytarilgan
+
+
+class NotificationOut(BaseModel):
+    kind: Literal["overdue", "due_today", "due_soon"]
+    warehouse_id: int
+    warehouse_name: str
+    debt_id: int
+    customer_id: int
+    customer_name: str
+    customer_phone: str
+    description: str
+    remaining: int
+    due_date: date
+    days_left: int
 
 
 # ---------- Dashboard ----------

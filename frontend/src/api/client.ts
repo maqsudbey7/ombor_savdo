@@ -1,5 +1,6 @@
 import { store } from '../store';
 import { logout } from '../store/authSlice';
+import { translate } from '../i18n';
 
 export class ApiError extends Error {
   status: number;
@@ -12,8 +13,9 @@ export class ApiError extends Error {
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 function authHeaders(): Record<string, string> {
-  const token = store.getState().auth.token;
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  const { auth, ui } = store.getState();
+  // Accept-Language — server xatolarni shu tilda qaytaradi
+  return { 'Accept-Language': ui.lang, ...(auth.token ? { Authorization: `Bearer ${auth.token}` } : {}) };
 }
 
 async function send(path: string, method: Method, body?: unknown): Promise<Response> {
@@ -23,12 +25,13 @@ async function send(path: string, method: Method, body?: unknown): Promise<Respo
   try {
     res = await fetch(`/api${path}`, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
   } catch {
-    throw new ApiError(0, 'Server bilan aloqa yo‘q. Internetni tekshiring.');
+    throw new ApiError(0, translate(store.getState().ui.lang, 'err.network'));
   }
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     if (res.status === 401 && headers.Authorization) store.dispatch(logout());
-    const detail = typeof data.detail === 'string' ? data.detail : res.status >= 500 ? 'Serverda xatolik. Birozdan so‘ng urinib ko‘ring.' : 'Xatolik yuz berdi';
+    const lang = store.getState().ui.lang;
+    const detail = typeof data.detail === 'string' ? data.detail : translate(lang, res.status >= 500 ? 'err.server' : 'err.generic');
     throw new ApiError(res.status, detail);
   }
   return res;
